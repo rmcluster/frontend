@@ -1,4 +1,5 @@
-import type { ChatMessage } from '../types/ui';
+import type { ChatMessage, ChatEventRequest, ChatSession } from '../types/ui';
+import { chatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
 
 export async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
@@ -39,12 +40,30 @@ export async function postForm<TResponse>(
   return response.json() as Promise<TResponse>;
 }
 
+export async function startChatSession(
+  chatId: string,
+  model: string
+): Promise<ChatSession> {
+  return postJson<ChatSession>(apiRoutes.uiChats, {
+    chat_id: chatId,
+    model,
+    started_at: new Date().toISOString(),
+  });
+}
+
+export async function appendChatEvent(
+  chatId: string,
+  event: ChatEventRequest
+): Promise<void> {
+  await postJson(chatEventsUrl(chatId), event);
+}
+
 export async function* streamChat(
   messages: ChatMessage[],
   model: string,
   signal: AbortSignal
 ): AsyncGenerator<string> {
-  const res = await fetch('/v1/chat/completions', {
+  const res = await fetch(chatCompletionsUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, messages, stream: true }),

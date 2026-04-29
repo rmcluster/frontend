@@ -54,10 +54,42 @@ export type Conversation = {
   updated_at: string;
 };
 
-export type LeaderboardEntry = {
-  rank: number;
-  username: string;
-  device_count: number;
-  compute_hours: number;
-  tokens_generated: number;
+export type ConnectInfo = {
+  host: string;
+  port: number;
+  token: string;
+  connect_uri: string;
+  token_expires_in_seconds: number;
+};
+
+export type ChatSession = {
+  chat_id: string;
+  model: string;
+  started_at: string;
+  status: 'active' | 'closed';
+};
+
+export type ChatEventType =
+  | 'message_sent'
+  | 'token_received'
+  | 'message_completed'
+  | 'stream_error'
+  | 'chat_closed';
+
+export type ChatEventRequest = {
+  event_type: ChatEventType;
+  message_id?: string;
+  role?: 'user' | 'assistant';
+  content?: string;
+  token?: string;
+  error?: string;
+  timestamp: string;
+};
+
+export type ChatEvent = ChatEventRequest & {
+  sequence: number;
+};
+
+export type ChatSessionDetail = ChatSession & {
+  events: ChatEvent[];
 };

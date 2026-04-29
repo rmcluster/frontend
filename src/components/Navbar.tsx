@@ -5,10 +5,8 @@ export function Navbar() {
   const { pathname } = useLocation();
 
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/devices', label: 'Devices' },
+    { to: '/', label: 'Dashboard' },
     { to: '/models', label: 'Models' },
-    { to: '/leaderboard', label: 'Leaderboard' },
     { to: '/chat', label: 'Chat' },
   ];
 

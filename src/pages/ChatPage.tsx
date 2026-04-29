@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useConversations } from '../context/ConversationContext';
-import { streamChat } from '../lib/api';
+import { streamChat, startChatSession, appendChatEvent } from '../lib/api';
 import { ChatComposer } from '../components/chat/ChatComposer';
 import { ChatMessages } from '../components/chat/ChatMessages';
 
@@ -32,9 +32,10 @@ export function ChatPage() {
         return;
       }
     }
-    // No matching conv — create one
     const conv = createConversation(modelParam);
     setActiveId(conv.id);
+    // Register the session server-side (best-effort)
+    void startChatSession(conv.id, modelParam).catch(() => undefined);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convParam]);
 
@@ -48,11 +49,15 @@ export function ChatPage() {
     const convId = activeId;
     if (!convId) return;
 
-    // Append user message
     appendMessage(convId, { role: 'user', content });
-
-    // Append empty assistant placeholder
     appendMessage(convId, { role: 'assistant', content: '' });
+
+    void appendChatEvent(convId, {
+      event_type: 'message_sent',
+      role: 'user',
+      content,
+      timestamp: new Date().toISOString(),
+    }).catch(() => undefined);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -64,16 +69,29 @@ export function ChatPage() {
       { role: 'user' as const, content },
     ];
 
+    let assistantContent = '';
     try {
       for await (const token of streamChat(history, model, controller.signal)) {
+        assistantContent += token;
         setStreamingContent((prev) => prev + token);
         updateLastMessage(convId, (prev) => prev + token);
       }
+      void appendChatEvent(convId, {
+        event_type: 'message_completed',
+        role: 'assistant',
+        content: assistantContent,
+        timestamp: new Date().toISOString(),
+      }).catch(() => undefined);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         updateLastMessage(convId, (prev) =>
           prev || '_(Error: could not reach model server)_'
         );
+        void appendChatEvent(convId, {
+          event_type: 'stream_error',
+          error: (err as Error).message,
+          timestamp: new Date().toISOString(),
+        }).catch(() => undefined);
       }
     } finally {
       setStreaming(false);

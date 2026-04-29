@@ -5,6 +5,7 @@ import { LocalModelModal } from '../components/models/LocalModelModal';
 import { ModelSearchResultsTable } from '../components/models/ModelSearchResultsTable';
 import { PageHeader } from '../components/PageHeader';
 import { getJson, postForm, postJson } from '../lib/api';
+import { apiRoutes } from '../lib/routes';
 import type { Model, SearchResult } from '../types/ui';
 
 export function ModelsPage() {
@@ -25,7 +26,7 @@ export function ModelsPage() {
     try {
       setLoading(true);
       setError(null);
-      const payload = await getJson<{ models: Model[] }>('/api/ui/models');
+      const payload = await getJson<{ models: Model[] }>(apiRoutes.uiModels);
       setModels(payload.models);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load models');
@@ -34,7 +35,9 @@ export function ModelsPage() {
     }
   };
 
-  useEffect(() => { void loadModels(); }, []);
+  useEffect(() => {
+    void loadModels();
+  }, []);
 
   const canUseLocalFile = useMemo(
     () => localFile && localFile.name.endsWith('.gguf'),
@@ -43,10 +46,13 @@ export function ModelsPage() {
 
   const onSearch = async (event: FormEvent) => {
     event.preventDefault();
-    if (!query.trim()) { setSearchResults([]); return; }
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
     try {
       setSearching(true);
-      const url = `/api/ui/models/search?q=${encodeURIComponent(query.trim())}`;
+      const url = `${apiRoutes.uiModelsSearch}?q=${encodeURIComponent(query.trim())}`;
       const payload = await getJson<{ results: SearchResult[] }>(url);
       setSearchResults(payload.results);
     } catch (err) {
@@ -58,7 +64,7 @@ export function ModelsPage() {
 
   const addHfModel = async (model: string) => {
     try {
-      await postJson('/api/ui/models/hf', { model });
+      await postJson(apiRoutes.uiModelsHF, { model });
       await loadModels();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add model');
@@ -67,7 +73,10 @@ export function ModelsPage() {
 
   const saveLocalModel = async (event: FormEvent) => {
     event.preventDefault();
-    if (!localFile || !canUseLocalFile) { setError('Select a .gguf file'); return; }
+    if (!localFile || !canUseLocalFile) {
+      setError('Select a .gguf file');
+      return;
+    }
     try {
       setUploading(true);
       setError(null);
@@ -76,7 +85,7 @@ export function ModelsPage() {
       formData.append('name', localName);
       formData.append('parameters', localParameters);
       formData.append('quantization', localQuantization);
-      await postForm('/api/ui/models/local', formData);
+      await postForm(apiRoutes.uiModelsLocal, formData);
       setDialogOpen(false);
       setLocalFile(null);
       setLocalName('');
@@ -101,7 +110,15 @@ export function ModelsPage() {
             className="btn btn-secondary"
             onClick={() => setDialogOpen(true)}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -119,12 +136,24 @@ export function ModelsPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search HuggingFace repos or paste owner/repo…"
           />
-          <button type="submit" className="btn btn-primary" disabled={searching}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={searching}
+          >
             {searching ? 'Searching…' : 'Search'}
           </button>
         </form>
         {error && (
-          <p style={{ color: 'var(--danger)', fontSize: '0.875rem', marginTop: '12px' }}>{error}</p>
+          <p
+            style={{
+              color: 'var(--danger)',
+              fontSize: '0.875rem',
+              marginTop: '12px',
+            }}
+          >
+            {error}
+          </p>
         )}
       </div>
 

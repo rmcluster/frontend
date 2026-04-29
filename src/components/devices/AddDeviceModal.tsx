@@ -1,42 +1,48 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'react-qr-code';
 import { useTheme } from '../../context/ThemeContext';
+import type { ConnectInfo } from '../../types/ui';
+import { apiRoutes } from '../../lib/routes';
 
 type AddDeviceModalProps = {
   open: boolean;
   onClose: () => void;
 };
 
-function generateToken(): string {
-  const array = new Uint8Array(16);
-  crypto.getRandomValues(array);
-  return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 export function AddDeviceModal({ open, onClose }: AddDeviceModalProps) {
   const { theme } = useTheme();
-  const [token, setToken] = useState('');
+  const [connectInfo, setConnectInfo] = useState<ConnectInfo | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Derive server address from wherever the browser is already talking to
-  const serverUrl = window.location.hostname;
-  const port = '4917';
+  const fetchConnectInfo = useCallback(async () => {
+    setConnectInfo(null);
+    setCopied(false);
+    try {
+      const res = await fetch(apiRoutes.uiConnectInfo, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) return;
+      const info = (await res.json()) as ConnectInfo;
+      setConnectInfo(info);
+    } catch {
+      // silently keep null state
+    }
+  }, []);
 
   useEffect(() => {
     if (open) {
-      setToken(generateToken());
-      setCopied(false);
+      void fetchConnectInfo();
     }
-  }, [open]);
+  }, [open, fetchConnectInfo]);
 
   if (!open) return null;
 
-  const qrUri = `rmcluster://connect?url=${encodeURIComponent(serverUrl)}&port=${port}&token=${token}`;
   const qrFg = theme === 'dark' ? '#e8ecf5' : '#0f1220';
 
   const handleCopy = async () => {
+    if (!connectInfo) return;
     try {
-      await navigator.clipboard.writeText(qrUri);
+      await navigator.clipboard.writeText(connectInfo.connect_uri);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -51,37 +57,50 @@ export function AddDeviceModal({ open, onClose }: AddDeviceModalProps) {
           <h2>Connect a device</h2>
           <p>
             Scan with the rmcluster app to connect to{' '}
-            <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85em' }}>
-              {serverUrl}:{port}
-            </code>
+            {connectInfo && (
+              <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85em' }}>
+                {connectInfo.host}:{connectInfo.port}
+              </code>
+            )}
           </p>
         </div>
         <div className="qr-container">
-          <div className="qr-box">
-            <QRCode
-              value={qrUri}
-              size={192}
-              bgColor="transparent"
-              fgColor={qrFg}
-              level="M"
-            />
-          </div>
-          <div className="connect-uri">
-            <code>{qrUri}</code>
-            <button
-              className="btn btn-secondary btn-sm"
-              style={{ flexShrink: 0 }}
-              onClick={() => void handleCopy()}
-            >
-              {copied ? '✓ Copied' : 'Copy'}
-            </button>
-          </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-            Single-use — expires after one connection.
-          </p>
+          {connectInfo ? (
+            <>
+              <div className="qr-box">
+                <QRCode
+                  value={connectInfo.connect_uri}
+                  size={192}
+                  bgColor="transparent"
+                  fgColor={qrFg}
+                  level="M"
+                />
+              </div>
+              <div className="connect-uri">
+                <code>{connectInfo.connect_uri}</code>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ flexShrink: 0 }}
+                  onClick={() => void handleCopy()}
+                >
+                  {copied ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                Single-use — expires in {connectInfo.token_expires_in_seconds}s.
+              </p>
+            </>
+          ) : (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+              Loading…
+            </div>
+          )}
         </div>
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={() => setToken(generateToken())}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => void fetchConnectInfo()}
+          >
             Regenerate
           </button>
           <button className="btn btn-primary" onClick={onClose}>

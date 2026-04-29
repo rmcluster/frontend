@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConversations } from '../../context/ConversationContext';
 import { ThemeToggle } from '../ThemeToggle';
 import { getJson } from '../../lib/api';
+import { apiRoutes, buildChatPath } from '../../lib/routes';
 import type { Model } from '../../types/ui';
 
 function relativeDate(iso: string): string {
@@ -18,8 +19,13 @@ function relativeDate(iso: string): string {
 export function ChatSidebar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { conversations, activeId, setActiveId, createConversation, deleteConversation } =
-    useConversations();
+  const {
+    conversations,
+    activeId,
+    setActiveId,
+    createConversation,
+    deleteConversation,
+  } = useConversations();
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>(
     searchParams.get('model') ?? ''
@@ -28,7 +34,7 @@ export function ChatSidebar() {
   useEffect(() => {
     void (async () => {
       try {
-        const payload = await getJson<{ models: Model[] }>('/api/ui/models');
+        const payload = await getJson<{ models: Model[] }>(apiRoutes.uiModels);
         setModels(payload.models);
         if (!selectedModel && payload.models.length > 0) {
           setSelectedModel(payload.models[0].model);
@@ -42,12 +48,12 @@ export function ChatSidebar() {
   const handleNewChat = () => {
     const conv = createConversation(selectedModel);
     setActiveId(conv.id);
-    navigate(`/chat?model=${encodeURIComponent(selectedModel)}&conv=${conv.id}`);
+    navigate(buildChatPath(selectedModel, conv.id));
   };
 
   const handleSelectConv = (id: string, model: string) => {
     setActiveId(id);
-    navigate(`/chat?model=${encodeURIComponent(model)}&conv=${id}`);
+    navigate(buildChatPath(model, id));
   };
 
   return (
@@ -65,7 +71,15 @@ export function ChatSidebar() {
           rmcluster
         </div>
         <button className="btn btn-primary w-full" onClick={handleNewChat}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          >
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
@@ -75,7 +89,12 @@ export function ChatSidebar() {
 
       {/* Model selector */}
       {models.length > 0 && (
-        <div style={{ padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border-subtle)' }}>
+        <div
+          style={{
+            padding: 'var(--space-2) var(--space-3)',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}
+        >
           <select
             className="chat-sidebar-model-select"
             value={selectedModel}
@@ -93,7 +112,14 @@ export function ChatSidebar() {
       {/* Conversation list */}
       <div className="chat-conv-list">
         {conversations.length === 0 ? (
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: 'var(--space-4) var(--space-2)', textAlign: 'center' }}>
+          <p
+            style={{
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)',
+              padding: 'var(--space-4) var(--space-2)',
+              textAlign: 'center',
+            }}
+          >
             No conversations yet
           </p>
         ) : (
@@ -107,7 +133,9 @@ export function ChatSidebar() {
               >
                 <div className="conv-item-text">
                   <div className="conv-title">{conv.title}</div>
-                  <div className="conv-date">{relativeDate(conv.updated_at)}</div>
+                  <div className="conv-date">
+                    {relativeDate(conv.updated_at)}
+                  </div>
                 </div>
                 <button
                   className="conv-delete"
@@ -117,7 +145,15 @@ export function ChatSidebar() {
                   }}
                   title="Delete conversation"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
@@ -130,8 +166,11 @@ export function ChatSidebar() {
 
       {/* Footer */}
       <div className="chat-sidebar-footer">
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', flex: 1 }}>
-          {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+        <span
+          style={{ fontSize: '0.78rem', color: 'var(--text-muted)', flex: 1 }}
+        >
+          {conversations.length} conversation
+          {conversations.length !== 1 ? 's' : ''}
         </span>
         <ThemeToggle />
       </div>

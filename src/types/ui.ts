@@ -7,6 +7,7 @@ export type Model = {
   source: string;
   link_href: string;
   link_label: string;
+  supports_thinking: boolean;
 };
 
 export type SearchResult = {

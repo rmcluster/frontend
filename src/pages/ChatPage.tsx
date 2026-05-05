@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConversations } from '../context/ConversationContext';
 import { streamChat, startChatSession, appendChatEvent, getLoadingStatus } from '../lib/api';
+import { useModels } from '../context/ModelsContext';
 import { buildChatPath } from '../lib/routes';
 import { ChatComposer } from '../components/chat/ChatComposer';
 import { ChatMessages } from '../components/chat/ChatMessages';
@@ -24,6 +25,8 @@ export function ChatPage() {
   const [streaming, setStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [loadingPhase, setLoadingPhase] = useState('');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const { models } = useModels();
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem('rmcluster_thinking') !== 'false'; }
     catch { return true; }
@@ -52,7 +55,7 @@ export function ChatPage() {
     }
     const id = setInterval(() => {
       void getLoadingStatus()
-        .then((s) => setLoadingPhase(s.phase))
+        .then((s) => { setLoadingPhase(s.phase); setLoadingProgress(s.progress); })
         .catch(() => undefined);
     }, 1200);
     return () => clearInterval(id);
@@ -80,6 +83,8 @@ export function ChatPage() {
   const activeConv = conversations.find((c) => c.id === activeId) ?? null;
   const messages = activeConv?.messages ?? [];
   const model = activeConv?.model ?? modelParam;
+
+  const thinkingSupported = models.find((m) => m.model === model)?.supports_thinking ?? false;
 
   const handleSend = async (content: string) => {
     if (!content.trim() || streaming) return;
@@ -183,16 +188,23 @@ export function ChatPage() {
       <div className="chat-topbar">
         <div className="chat-topbar-title">{title}</div>
         <div className="chat-topbar-right">
-          <button
-            className={`thinking-toggle-btn${thinkingEnabled ? ' active' : ''}`}
-            onClick={toggleThinking}
-            title={thinkingEnabled ? 'Thinking mode on — click to disable' : 'Thinking mode off — click to enable'}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9.663 17h4.673M12 3a7 7 0 0 1 4.95 11.95A5 5 0 0 1 12 21a5 5 0 0 1-4.95-6.05A7 7 0 0 1 12 3z"/>
-            </svg>
-            Think
-          </button>
+          {thinkingSupported && (
+            <label
+              className="thinking-toggle"
+              title={thinkingEnabled ? 'Thinking mode on — click to disable' : 'Thinking mode off — click to enable'}
+            >
+              <input
+                type="checkbox"
+                checked={thinkingEnabled}
+                onChange={toggleThinking}
+                style={{ display: 'none' }}
+              />
+              <span className={`thinking-toggle-track${thinkingEnabled ? ' on' : ''}`}>
+                <span className="thinking-toggle-thumb" />
+              </span>
+              <span className="thinking-toggle-label">Think</span>
+            </label>
+          )}
           <div className="chat-topbar-model">{modelLabel}</div>
         </div>
       </div>
@@ -201,6 +213,7 @@ export function ChatPage() {
         streaming={streaming}
         streamingContent={streamingContent}
         loadingPhase={loadingPhase}
+        loadingProgress={loadingProgress}
       />
       <ChatComposer
         onSend={(content) => void handleSend(content)}

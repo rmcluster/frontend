@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConversations } from '../../context/ConversationContext';
+import { useModels } from '../../context/ModelsContext';
 import { ThemeToggle } from '../ThemeToggle';
-import { getJson } from '../../lib/api';
-import { apiRoutes, buildChatPath } from '../../lib/routes';
-import type { Model } from '../../types/ui';
+import { buildChatPath } from '../../lib/routes';
 
 function relativeDate(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -27,7 +26,7 @@ export function ChatSidebar() {
     updateConversationModel,
     deleteConversation,
   } = useConversations();
-  const [models, setModels] = useState<Model[]>([]);
+  const { models } = useModels();
   const [selectedModel, setSelectedModel] = useState<string>(
     searchParams.get('model') ?? ''
   );
@@ -38,19 +37,12 @@ export function ChatSidebar() {
     if (urlModel) setSelectedModel(urlModel);
   }, [searchParams]);
 
+  // Auto-select the first model once the list loads
   useEffect(() => {
-    void (async () => {
-      try {
-        const payload = await getJson<{ models: Model[] }>(apiRoutes.uiModels);
-        setModels(payload.models);
-        if (!selectedModel && payload.models.length > 0) {
-          setSelectedModel(payload.models[0].model);
-        }
-      } catch {
-        /* no models endpoint yet */
-      }
-    })();
-  }, []);
+    if (!selectedModel && models.length > 0) {
+      setSelectedModel(models[0].model);
+    }
+  }, [models, selectedModel]);
 
   const handleNewChat = () => {
     const conv = createConversation(selectedModel);

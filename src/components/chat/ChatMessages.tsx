@@ -8,14 +8,18 @@ type ChatMessagesProps = {
   streaming: boolean;
   streamingContent: string;
   loadingPhase?: string;
+  loadingProgress?: number;
 };
 
-const PHASE_LABELS: Record<string, string> = {
-  starting:      'Starting instance…',
-  downloading:   'Downloading model…',
-  loading_model: 'Loading model into memory…',
-  warming_up:    'Warming up…',
-};
+function phaseLabel(phase: string, progress: number): string {
+  switch (phase) {
+    case 'starting':      return 'Starting instance…';
+    case 'downloading':   return progress > 0 ? `Downloading model… ${progress.toFixed(1)}%` : 'Downloading model…';
+    case 'loading_model': return 'Loading model into memory…';
+    case 'warming_up':    return 'Warming up…';
+    default:              return '';
+  }
+}
 
 // Split a raw assistant content string into its <think> block and the visible response.
 function parseThinking(content: string): {
@@ -91,7 +95,7 @@ const AssistantIcon = () => (
   </svg>
 );
 
-export function ChatMessages({ messages, streaming, streamingContent, loadingPhase }: ChatMessagesProps) {
+export function ChatMessages({ messages, streaming, streamingContent, loadingPhase, loadingProgress = 0 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -140,12 +144,12 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
           <div className="msg-avatar assistant-avatar">
             <AssistantIcon />
           </div>
-          {loadingPhase && PHASE_LABELS[loadingPhase] ? (
+          {loadingPhase && phaseLabel(loadingPhase, loadingProgress) ? (
             <div className="typing-status">
               <span className="typing-dot" />
               <span className="typing-dot" />
               <span className="typing-dot" />
-              <span className="typing-status-text">{PHASE_LABELS[loadingPhase]}</span>
+              <span className="typing-status-text">{phaseLabel(loadingPhase, loadingProgress)}</span>
             </div>
           ) : (
             <div className="typing-indicator">

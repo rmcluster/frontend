@@ -23,7 +23,7 @@ export function ChatPage() {
   const [streamingContent, setStreamingContent] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
-  // Resolve active conversation on mount / when params change
+  // Resolve active conversation on mount / when model or conv params change
   useEffect(() => {
     if (convParam) {
       const found = conversations.find((c) => c.id === convParam);
@@ -32,12 +32,13 @@ export function ChatPage() {
         return;
       }
     }
+    if (!modelParam) return;
     const conv = createConversation(modelParam);
     setActiveId(conv.id);
     // Register the session server-side (best-effort)
     void startChatSession(conv.id, modelParam).catch(() => undefined);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [convParam]);
+  }, [convParam, modelParam]);
 
   const activeConv = conversations.find((c) => c.id === activeId) ?? null;
   const messages = activeConv?.messages ?? [];

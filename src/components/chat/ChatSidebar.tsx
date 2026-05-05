@@ -24,12 +24,19 @@ export function ChatSidebar() {
     activeId,
     setActiveId,
     createConversation,
+    updateConversationModel,
     deleteConversation,
   } = useConversations();
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>(
     searchParams.get('model') ?? ''
   );
+
+  // Keep dropdown in sync when URL model param changes (e.g. clicking a conversation)
+  useEffect(() => {
+    const urlModel = searchParams.get('model');
+    if (urlModel) setSelectedModel(urlModel);
+  }, [searchParams]);
 
   useEffect(() => {
     void (async () => {
@@ -98,7 +105,21 @@ export function ChatSidebar() {
           <select
             className="chat-sidebar-model-select"
             value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
+            onChange={(e) => {
+              const newModel = e.target.value;
+              setSelectedModel(newModel);
+              const activeConv = conversations.find((c) => c.id === activeId);
+              const hasMessages = (activeConv?.messages.length ?? 0) > 0;
+              if (!hasMessages) {
+                if (activeId && activeConv) {
+                  // Reuse the existing empty conversation — just swap its model
+                  updateConversationModel(activeId, newModel);
+                  navigate(buildChatPath(newModel, activeId));
+                } else {
+                  navigate(buildChatPath(newModel));
+                }
+              }
+            }}
           >
             {models.map((m) => (
               <option key={m.model} value={m.model}>

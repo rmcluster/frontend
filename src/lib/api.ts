@@ -58,6 +58,10 @@ export async function appendChatEvent(
   await postJson(chatEventsUrl(chatId), event);
 }
 
+export async function getLoadingStatus(): Promise<{ model: string; phase: string }> {
+  return getJson<{ model: string; phase: string }>('/api/ui/loading-status');
+}
+
 export async function* streamChat(
   messages: ChatMessage[],
   model: string,

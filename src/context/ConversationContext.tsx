@@ -25,6 +25,7 @@ type ConversationContextValue = {
   createConversation: (model: string) => Conversation;
   appendMessage: (id: string, message: ChatMessage) => void;
   updateLastMessage: (id: string, updater: (prev: string) => string) => void;
+  updateConversationModel: (id: string, model: string) => void;
   deleteConversation: (id: string) => void;
   renameConversation: (id: string, title: string) => void;
 };
@@ -87,6 +88,10 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     );
   }, [update]);
 
+  const updateConversationModel = useCallback((id: string, model: string) => {
+    update((prev) => prev.map((c) => c.id === id ? { ...c, model } : c));
+  }, [update]);
+
   const deleteConversation = useCallback((id: string) => {
     update((prev) => prev.filter((c) => c.id !== id));
     setActiveId((prev) => (prev === id ? null : prev));
@@ -105,6 +110,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
         createConversation,
         appendMessage,
         updateLastMessage,
+        updateConversationModel,
         deleteConversation,
         renameConversation,
       }}

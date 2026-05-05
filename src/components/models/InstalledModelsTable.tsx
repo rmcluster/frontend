@@ -33,6 +33,7 @@ export function InstalledModelsTable({
               <th>Parameters</th>
               <th>Architecture</th>
               <th>Quantization</th>
+              <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Thinking</th>
               <th>Source</th>
               <th>Actions</th>
             </tr>
@@ -44,7 +45,7 @@ export function InstalledModelsTable({
               ))
             ) : models.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <div
                     className="empty-state"
                     style={{ padding: 'var(--space-10) 0' }}
@@ -99,6 +100,11 @@ export function InstalledModelsTable({
                     }}
                   >
                     {model.quantization || '—'}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {model.supports_thinking && (
+                      <span className="badge badge-thinking">Think</span>
+                    )}
                   </td>
                   <td>
                     <span

@@ -184,10 +184,13 @@ export function ChatPage() {
   const modelLabel = model || 'No model';
 
   return (
-    <div className="chat-main">
-      <div className="chat-topbar">
-        <div className="chat-topbar-title">{title}</div>
-        <div className="chat-topbar-right">
+    <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      {/* Topbar */}
+      <div className="flex items-center justify-between px-6 h-14 border-b border-[var(--border)] flex-shrink-0">
+        <div className="font-[var(--font-heading)] text-sm font-semibold text-[var(--text-primary)]">
+          {title}
+        </div>
+        <div className="flex items-center gap-2">
           {thinkingSupported && (
             <label
               className="thinking-toggle"
@@ -205,7 +208,9 @@ export function ChatPage() {
               <span className="thinking-toggle-label">Think</span>
             </label>
           )}
-          <div className="chat-topbar-model">{modelLabel}</div>
+          <div className="text-xs text-[var(--text-muted)] font-[var(--font-mono)] px-2 py-0.5 bg-[var(--bg-elevated)] border border-[var(--border)] rounded">
+            {modelLabel}
+          </div>
         </div>
       </div>
       <ChatMessages

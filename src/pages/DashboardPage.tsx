@@ -36,8 +36,11 @@ export function DashboardPage() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+      <div className="flex justify-end mb-4">
+        <button
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none"
+          onClick={() => setShowAdd(true)}
+        >
           Connect a device
         </button>
       </div>

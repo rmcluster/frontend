@@ -36,11 +36,11 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
   };
 
   return (
-    <div className="chat-composer-wrap">
-      <div className="chat-composer">
+    <div className="px-6 pb-4 flex-shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-base)]">
+      <div className="flex items-end gap-3 bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-xl)] px-5 py-3 focus-within:border-[var(--border-focus)] focus-within:shadow-[0_0_0_3px_var(--accent-dim)] transition-all max-w-[780px] mx-auto">
         <textarea
           ref={textareaRef}
-          className="chat-composer-textarea"
+          className="chat-composer-textarea flex-1 resize-none border-0 outline-none bg-transparent text-[0.9375rem] text-[var(--text-primary)] leading-relaxed max-h-[180px] overflow-y-auto p-0 placeholder:text-[var(--text-muted)]"
           placeholder="Ask anything… (Ctrl+Enter to send)"
           onKeyDown={handleKeyDown}
           onInput={handleInput}
@@ -50,7 +50,7 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
         {streaming ? (
           <button
             type="button"
-            className="chat-composer-send chat-composer-stop"
+            className="flex-shrink-0 w-9 h-9 rounded-[var(--radius-md)] bg-[var(--danger-dim)] text-[var(--danger)] border border-[var(--danger-dim)] grid place-items-center hover:bg-[var(--danger)] hover:text-white transition-colors"
             onClick={onStop}
             title="Stop generating"
           >
@@ -61,7 +61,7 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
         ) : (
           <button
             type="button"
-            className="chat-composer-send"
+            className="flex-shrink-0 w-9 h-9 rounded-[var(--radius-md)] bg-[var(--accent)] text-white border-0 grid place-items-center hover:bg-[var(--accent-hover)] hover:scale-105 transition-all disabled:opacity-35 disabled:cursor-not-allowed disabled:scale-100"
             onClick={submit}
             disabled={disabled}
             title="Send message (Ctrl+Enter)"
@@ -73,7 +73,9 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
           </button>
         )}
       </div>
-      <p className="composer-hint">Ctrl+Enter to send · rmcluster</p>
+      <p className="text-center text-[0.7rem] text-[var(--text-muted)] mt-2 font-[var(--font-mono)]">
+        Ctrl+Enter to send · rmcluster
+      </p>
     </div>
   );
 }

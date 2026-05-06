@@ -103,11 +103,11 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
   }, [messages.length, streamingContent]);
 
   if (messages.length === 0 && !streaming) {
-    return <div className="chat-messages" />;
+    return <div className="chat-messages flex-1 overflow-y-auto px-6 pt-6 pb-4 flex flex-col gap-5" />;
   }
 
   return (
-    <div className="chat-messages">
+    <div className="chat-messages flex-1 overflow-y-auto px-6 pt-6 pb-4 flex flex-col gap-5">
       {messages.map((msg, idx) => {
         // The empty assistant placeholder added at the start of streaming is
         // visually covered by the typing indicator — skip it to avoid a double row.
@@ -116,9 +116,11 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
         if (msg.role === 'assistant') {
           const { thinking, response, thinkingComplete } = parseThinking(msg.content);
           return (
-            <div key={idx} className="msg-row assistant">
-              <div className="msg-avatar assistant-avatar"><AssistantIcon /></div>
-              <div className="msg-bubble msg-bubble--markdown">
+            <div key={idx} className="flex gap-3 max-w-[780px] w-full self-start">
+              <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold font-[var(--font-heading)] bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent)] mt-0.5">
+                <AssistantIcon />
+              </div>
+              <div className="msg-bubble--markdown px-4 py-2.5 rounded-2xl rounded-bl-[var(--radius-sm)] text-[0.9375rem] leading-relaxed max-w-[600px] word-break bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-primary)]">
                 {thinking && (
                   <ThinkingBlock thinking={thinking} thinkingComplete={thinkingComplete} />
                 )}
@@ -131,17 +133,21 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
         }
 
         return (
-          <div key={idx} className="msg-row user">
-            <div className="msg-avatar user-avatar">U</div>
-            <div className="msg-bubble">{msg.content}</div>
+          <div key={idx} className="flex gap-3 max-w-[780px] w-full self-end flex-row-reverse">
+            <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold font-[var(--font-heading)] bg-[var(--accent)] text-white mt-0.5">
+              U
+            </div>
+            <div className="px-4 py-2.5 rounded-2xl rounded-br-[var(--radius-sm)] text-[0.9375rem] leading-relaxed max-w-[600px] break-words whitespace-pre-wrap bg-[var(--accent)] text-white">
+              {msg.content}
+            </div>
           </div>
         );
       })}
 
       {/* Status indicator while waiting for first token */}
       {streaming && streamingContent === '' && (
-        <div className="msg-row assistant">
-          <div className="msg-avatar assistant-avatar">
+        <div className="flex gap-3 max-w-[780px] w-full self-start">
+          <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent)] mt-0.5">
             <AssistantIcon />
           </div>
           {loadingPhase && phaseLabel(loadingPhase, loadingProgress) ? (

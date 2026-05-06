@@ -12,8 +12,16 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('rmcluster_theme');
-    return saved === 'light' || saved === 'dark' ? saved : 'dark';
+    try {
+      const saved = localStorage.getItem('rmcluster_theme');
+      const resolved: Theme = saved === 'light' || saved === 'dark' ? saved : 'dark';
+      // Apply synchronously so CSS variables are defined on the very first paint.
+      document.documentElement.setAttribute('data-theme', resolved);
+      return resolved;
+    } catch {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      return 'dark';
+    }
   });
 
   useEffect(() => {

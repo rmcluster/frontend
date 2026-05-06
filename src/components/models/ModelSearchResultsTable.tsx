@@ -9,39 +9,47 @@ export function ModelSearchResultsTable({ results, onAdd }: ModelSearchResultsTa
   if (results.length === 0) return null;
 
   return (
-    <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-      <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-4)', letterSpacing: '-0.01em' }}>
+    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-4">
+      <h2 className="font-[var(--font-heading)] text-base font-semibold text-[var(--text-primary)] mb-4 tracking-[-0.01em]">
         Search results
       </h2>
-      <div className="table-wrap">
-        <table>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th>Model</th>
-              <th>Downloads</th>
-              <th>Actions</th>
+              {['Model', 'Downloads', 'Actions'].map((h) => (
+                <th
+                  key={h}
+                  className="font-[var(--font-mono)] text-[0.72rem] uppercase tracking-[0.08em] text-[var(--text-muted)] px-4 py-3 border-b border-[var(--border)] text-left whitespace-nowrap"
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {results.map((item) => (
-              <tr key={item.model}>
-                <td>
-                  <div className="td-name">{item.display_name}</div>
-                  <div className="td-sub">{item.model}</div>
+              <tr key={item.model} className="hover:[&>td]:bg-[var(--bg-elevated)]">
+                <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[var(--text-primary)] transition-colors">
+                  <div className="font-medium">{item.display_name}</div>
+                  <div className="text-xs text-[var(--text-muted)] font-[var(--font-mono)] mt-0.5">{item.model}</div>
                 </td>
-                <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
+                <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
                   {item.downloads.toLocaleString()}
                 </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => onAdd(item.model)}>
+                <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle transition-colors">
+                  <div className="flex gap-1.5">
+                    <button
+                      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none"
+                      onClick={() => onAdd(item.model)}
+                    >
                       Add
                     </button>
                     <a
                       href={item.link_href}
                       target="_blank"
                       rel="noreferrer"
-                      className="btn btn-secondary btn-sm"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
                     >
                       Repo
                     </a>

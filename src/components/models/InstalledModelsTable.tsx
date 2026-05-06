@@ -13,29 +13,23 @@ export function InstalledModelsTable({
   loading,
 }: InstalledModelsTableProps) {
   return (
-    <div className="card">
-      <h2
-        style={{
-          fontFamily: 'var(--font-heading)',
-          fontSize: '1rem',
-          fontWeight: 600,
-          marginBottom: 'var(--space-4)',
-          letterSpacing: '-0.01em',
-        }}
-      >
+    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
+      <h2 className="font-[var(--font-heading)] text-base font-semibold text-[var(--text-primary)] mb-4 tracking-[-0.01em]">
         Installed models
       </h2>
-      <div className="table-wrap">
-        <table>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Parameters</th>
-              <th>Architecture</th>
-              <th>Quantization</th>
-              <th style={{ width: '1%', whiteSpace: 'nowrap' }}>Thinking</th>
-              <th>Source</th>
-              <th>Actions</th>
+              {['Name', 'Parameters', 'Architecture', 'Quantization', 'Thinking', 'Source', 'Actions'].map((h, i) => (
+                <th
+                  key={h}
+                  className="font-[var(--font-mono)] text-[0.72rem] uppercase tracking-[0.08em] text-[var(--text-muted)] px-4 py-3 border-b border-[var(--border)] text-left whitespace-nowrap"
+                  style={i === 4 ? { width: '1%', whiteSpace: 'nowrap' } : undefined}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -45,12 +39,9 @@ export function InstalledModelsTable({
               ))
             ) : models.length === 0 ? (
               <tr>
-                <td colSpan={7}>
-                  <div
-                    className="empty-state"
-                    style={{ padding: 'var(--space-10) 0' }}
-                  >
-                    <div className="empty-state-icon">
+                <td colSpan={7} className="px-4 py-4 text-[var(--text-primary)] align-middle">
+                  <div className="flex flex-col items-center justify-center text-center gap-3 py-10">
+                    <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--accent-dim)] grid place-items-center text-[var(--accent)]">
                       <svg
                         width="20"
                         height="20"
@@ -63,8 +54,10 @@ export function InstalledModelsTable({
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                       </svg>
                     </div>
-                    <h3>No models installed</h3>
-                    <p>
+                    <h3 className="font-[var(--font-heading)] text-base font-semibold text-[var(--text-primary)]">
+                      No models installed
+                    </h3>
+                    <p className="text-sm text-[var(--text-secondary)] max-w-[320px]">
                       Search Hugging Face above or upload a local .gguf file.
                     </p>
                   </div>
@@ -72,61 +65,35 @@ export function InstalledModelsTable({
               </tr>
             ) : (
               models.map((model) => (
-                <tr key={model.model}>
-                  <td>
-                    <div className="td-name">{model.display_name}</div>
-                    <div className="td-sub">{model.model}</div>
+                <tr key={model.model} className="hover:[&>td]:bg-[var(--bg-elevated)]">
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[var(--text-primary)] transition-colors">
+                    <div className="font-medium">{model.display_name}</div>
+                    <div className="text-xs text-[var(--text-muted)] font-[var(--font-mono)] mt-0.5">{model.model}</div>
                   </td>
-                  <td
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '0.8125rem',
-                    }}
-                  >
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
                     {model.parameters || '—'}
                   </td>
-                  <td
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '0.8125rem',
-                    }}
-                  >
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
                     {model.architecture || '—'}
                   </td>
-                  <td
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '0.8125rem',
-                    }}
-                  >
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
                     {model.quantization || '—'}
                   </td>
-                  <td style={{ textAlign: 'center' }}>
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-center transition-colors">
                     {model.supports_thinking && (
-                      <span className="badge badge-thinking">Think</span>
+                      <span className="inline-flex items-center text-[0.7rem] font-semibold tracking-wide px-1.5 py-0.5 rounded-full border text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border-[color-mix(in_srgb,var(--accent)_30%,transparent)]">
+                        Think
+                      </span>
                     )}
                   </td>
-                  <td>
-                    <span
-                      style={{
-                        fontSize: '0.8125rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      {model.source}
-                    </span>
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[0.8125rem] text-[var(--text-secondary)] transition-colors">
+                    {model.source}
                   </td>
-                  <td>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '6px',
-                        alignItems: 'center',
-                      }}
-                    >
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle transition-colors">
+                    <div className="flex gap-1.5 items-center">
                       <Link
                         to={buildChatPath(model.model)}
-                        className="btn btn-primary btn-sm"
+                        className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none"
                       >
                         Chat
                       </Link>
@@ -134,7 +101,7 @@ export function InstalledModelsTable({
                         href={model.link_href}
                         target="_blank"
                         rel="noreferrer"
-                        className="btn btn-secondary btn-sm"
+                        className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
                       >
                         {model.link_label}
                       </a>

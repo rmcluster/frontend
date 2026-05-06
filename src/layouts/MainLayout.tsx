@@ -3,9 +3,9 @@ import { Navbar } from '../components/Navbar';
 
 export function MainLayout() {
   return (
-    <div className="main-layout">
+    <div className="min-h-screen bg-[var(--bg-base)]">
       <Navbar />
-      <main className="page-content">
+      <main className="max-w-[var(--page-max)] mx-auto px-6 py-8 pt-[calc(var(--navbar-height)+32px)]">
         <Outlet />
       </main>
     </div>

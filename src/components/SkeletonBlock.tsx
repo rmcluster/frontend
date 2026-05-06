@@ -18,7 +18,7 @@ export function SkeletonRow({ cols }: { cols: number }) {
   return (
     <tr aria-hidden="true">
       {Array.from({ length: cols }).map((_, i) => (
-        <td key={i}>
+        <td key={i} className="p-4 border-b border-[var(--border-subtle)]">
           <SkeletonBlock height="0.875rem" width={i === 0 ? '140px' : '80px'} />
         </td>
       ))}

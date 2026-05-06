@@ -6,11 +6,11 @@ import { ModelsProvider } from '../context/ModelsContext';
 export function ChatLayout() {
   return (
     <ModelsProvider>
-      <div className="chat-layout">
+      <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-base)]">
         <Navbar />
-        <div className="chat-body">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <ChatSidebar />
-          <div className="chat-main">
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
             <Outlet />
           </div>
         </div>

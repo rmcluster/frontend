@@ -107,7 +107,7 @@ export function ModelsPage() {
         subtitle="Search Hugging Face for GGUF models or upload from local disk."
         actions={
           <button
-            className="btn btn-secondary"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
             onClick={() => setDialogOpen(true)}
           >
             <svg
@@ -128,30 +128,24 @@ export function ModelsPage() {
       />
 
       {/* Search */}
-      <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
-        <form className="models-search-row" onSubmit={onSearch}>
+      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-4">
+        <form className="flex gap-3 items-stretch flex-wrap" onSubmit={onSearch}>
           <input
-            className="input"
+            className="flex-1 min-w-[200px] w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent)] transition-colors"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search HuggingFace repos or paste owner/repo…"
           />
           <button
             type="submit"
-            className="btn btn-primary"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={searching}
           >
             {searching ? 'Searching…' : 'Search'}
           </button>
         </form>
         {error && (
-          <p
-            style={{
-              color: 'var(--danger)',
-              fontSize: '0.875rem',
-              marginTop: '12px',
-            }}
-          >
+          <p className="text-[var(--danger)] text-sm mt-3">
             {error}
           </p>
         )}

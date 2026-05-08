@@ -6,7 +6,7 @@ import { ModelsProvider } from '../context/ModelsContext';
 export function ChatLayout() {
   return (
     <ModelsProvider>
-      <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-base)]">
+      <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-base)] pt-(--navbar-height)">
         <Navbar />
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <ChatSidebar />

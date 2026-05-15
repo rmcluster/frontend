@@ -17,6 +17,11 @@ export default defineConfig({
         changeOrigin: true,
         timeout: 0,
       },
+      '/dav': {
+        target: 'http://127.0.0.1:4917',
+        changeOrigin: true,
+        timeout: 0,
+      },
     },
   },
 });

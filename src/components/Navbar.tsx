@@ -7,6 +7,7 @@ export function Navbar() {
   const navLinks = [
     { to: '/', label: 'Dashboard' },
     { to: '/models', label: 'Models' },
+    { to: '/files', label: 'Files' },
     { to: '/chat', label: 'Chat' },
   ];
 

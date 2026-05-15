@@ -160,6 +160,7 @@ type FileViewerProps = {
   onRename: (updated: DavEntry) => void;
   fileMode?: 'preview' | 'edit' | null;
   onFileModeChange?: (mode: 'preview' | 'edit') => void;
+  renameSignal?: number;
 };
 
 export function FileViewer({
@@ -168,6 +169,7 @@ export function FileViewer({
   onRename,
   fileMode,
   onFileModeChange,
+  renameSignal,
 }: FileViewerProps) {
   const [textContent, setTextContent] = useState('');
   const [isDirty, setIsDirty] = useState(false);
@@ -187,6 +189,7 @@ export function FileViewer({
 
   // Sync preview when URL-driven fileMode changes (e.g. after reload)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (fileMode != null) setPreview(fileMode === 'preview');
   }, [fileMode]);
 
@@ -202,8 +205,15 @@ export function FileViewer({
   const url = downloadUrl(entry.path);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRenameValue(entry.name);
   }, [entry.name]);
+
+  useEffect(() => {
+    if (renameSignal) startRenameTitle();
+    // startRenameTitle is stable (no deps); only fire on signal change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renameSignal]);
 
   // Warn before browser refresh/close when there are unsaved edits
   useEffect(() => {
@@ -218,6 +228,7 @@ export function FileViewer({
 
   useEffect(() => {
     if (kind !== 'text') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingText(true);
     setFetchError(null);
     setTextContent('');

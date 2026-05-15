@@ -1,4 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '../ui/Dialog';
 
 type NewFileModalProps = {
   open: boolean;
@@ -11,9 +19,15 @@ export function NewFileModal({ open, onClose, onCreate }: NewFileModalProps) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!open) return null;
+  function handleOpenChange(o: boolean) {
+    if (!o) {
+      setName('');
+      setError(null);
+      onClose();
+    }
+  }
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -30,29 +44,15 @@ export function NewFileModal({ open, onClose, onCreate }: NewFileModalProps) {
     }
   }
 
-  function handleClose() {
-    setName('');
-    setError(null);
-    onClose();
-  }
-
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={handleClose}
-    >
-      <div
-        className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-xl)] p-6 w-full max-w-sm shadow-[var(--shadow-lg)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5">
-          <h2 className="font-[var(--font-heading)] text-lg font-bold text-[var(--text-primary)]">
-            New file
-          </h2>
-          <p className="mt-1 text-[var(--text-secondary)] text-sm">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New file</DialogTitle>
+          <DialogDescription>
             Creates an empty file you can edit right away.
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-1.5 mb-4">
             <label
@@ -73,24 +73,24 @@ export function NewFileModal({ open, onClose, onCreate }: NewFileModalProps) {
               <p className="text-xs text-[var(--danger)] mt-1">{error}</p>
             )}
           </div>
-          <div className="flex justify-end gap-2 mt-6">
+          <DialogFooter>
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
-              onClick={handleClose}
+              onClick={() => handleOpenChange(false)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors cursor-pointer outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!name.trim() || creating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? 'Creating…' : 'Create & open'}
             </button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

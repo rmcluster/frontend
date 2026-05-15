@@ -18,6 +18,7 @@ export type SearchResult = {
 };
 
 export type DashboardServer = {
+  id: string;
   ip: string;
   port: number;
   hardware_model: string;

@@ -1,6 +1,8 @@
 import { useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 
+const MIN_COMPOSER_HEIGHT = 40;
+
 type ChatComposerProps = {
   onSend: (content: string) => void;
   onStop: () => void;
@@ -17,7 +19,7 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
     onSend(val);
     if (textareaRef.current) {
       textareaRef.current.value = '';
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${MIN_COMPOSER_HEIGHT}px`;
     }
   };
 
@@ -32,15 +34,15 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    el.style.height = `${Math.max(MIN_COMPOSER_HEIGHT, Math.min(el.scrollHeight, 180))}px`;
   };
 
   return (
-    <div className="px-6 pb-4 flex-shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-base)]">
+    <div className="px-6 pt-4 pb-4 flex-shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-base)]">
       <div className="flex items-end gap-3 bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-xl)] px-5 py-3 focus-within:border-[var(--border-focus)] focus-within:shadow-[0_0_0_3px_var(--accent-dim)] transition-all max-w-[780px] mx-auto">
         <textarea
           ref={textareaRef}
-          className="chat-composer-textarea flex-1 resize-none border-0 outline-none bg-transparent text-[0.9375rem] text-[var(--text-primary)] leading-relaxed max-h-[180px] overflow-y-auto p-0 placeholder:text-[var(--text-muted)]"
+          className="chat-composer-textarea flex-1 resize-none border-0 outline-none bg-transparent text-[0.9375rem] text-[var(--text-primary)] leading-5 min-h-10 max-h-[180px] overflow-y-auto py-2.5 px-0 placeholder:text-[var(--text-muted)]"
           placeholder="Ask anything… (Ctrl+Enter to send)"
           onKeyDown={handleKeyDown}
           onInput={handleInput}

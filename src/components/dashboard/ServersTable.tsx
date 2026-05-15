@@ -41,7 +41,7 @@ export function ServersTable({ servers, loading }: ServersTableProps) {
             ) : (
               servers.map((server) => (
                 <tr
-                  key={`${server.ip}:${server.port}`}
+                  key={server.id}
                   className="hover:[&>td]:bg-[var(--bg-elevated)]"
                 >
                   {[server.ip, server.port, server.hardware_model || '—', server.max_size ?? '—', server.battery ?? '—', server.temperature ?? '—'].map((val, i) => (

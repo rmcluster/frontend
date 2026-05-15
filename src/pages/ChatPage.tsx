@@ -123,8 +123,7 @@ export function ChatPage() {
       }
       for await (const token of streamChat(history, model, controller.signal)) {
         assistantContent += token;
-        setStreamingContent((prev) => prev + token);
-        updateLastMessage(convId, (prev) => prev + token);
+        setStreamingContent(assistantContent);
       }
       return true;
     };
@@ -139,6 +138,7 @@ export function ChatPage() {
         if (!succeeded) throw new DOMException('Aborted', 'AbortError');
       }
 
+      updateLastMessage(convId, () => assistantContent);
       void appendChatEvent(convId, {
         event_type: 'message_completed',
         role: 'assistant',
@@ -150,6 +150,7 @@ export function ChatPage() {
         // First attempt threw — retry once before surfacing the error
         try {
           await attemptStream(true);
+          updateLastMessage(convId, () => assistantContent);
           void appendChatEvent(convId, {
             event_type: 'message_completed',
             role: 'assistant',

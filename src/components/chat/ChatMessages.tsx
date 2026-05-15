@@ -144,6 +144,27 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
         );
       })}
 
+      {/* Live streaming message — rendered directly from streamingContent to avoid
+          per-token localStorage writes that come with updating the messages array */}
+      {streaming && streamingContent !== '' && (() => {
+        const { thinking, response, thinkingComplete } = parseThinking(streamingContent);
+        return (
+          <div className="flex gap-3 max-w-[780px] w-full self-start">
+            <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold font-[var(--font-heading)] bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent)] mt-0.5">
+              <AssistantIcon />
+            </div>
+            <div className="msg-bubble--markdown px-4 py-2.5 rounded-2xl rounded-bl-[var(--radius-sm)] text-[0.9375rem] leading-relaxed max-w-[600px] word-break bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-primary)]">
+              {thinking && (
+                <ThinkingBlock thinking={thinking} thinkingComplete={thinkingComplete} />
+              )}
+              {response && (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{response}</ReactMarkdown>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Status indicator while waiting for first token */}
       {streaming && streamingContent === '' && (
         <div className="flex gap-3 max-w-[780px] w-full self-start">

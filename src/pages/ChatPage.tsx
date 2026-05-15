@@ -45,6 +45,7 @@ export function ChatPage() {
   // Once the first token arrives (streamingContent !== '') stop immediately.
   useEffect(() => {
     if (!streaming) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingPhase('');
       return;
     }

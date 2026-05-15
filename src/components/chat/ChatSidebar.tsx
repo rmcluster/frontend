@@ -34,12 +34,14 @@ export function ChatSidebar() {
   // Keep dropdown in sync when URL model param changes (e.g. clicking a conversation)
   useEffect(() => {
     const urlModel = searchParams.get('model');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (urlModel) setSelectedModel(urlModel);
   }, [searchParams]);
 
   // Auto-select the first model once the list loads
   useEffect(() => {
     if (!selectedModel && models.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedModel(models[0].model);
     }
   }, [models, selectedModel]);

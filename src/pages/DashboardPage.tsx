@@ -11,8 +11,6 @@ export function DashboardPage() {
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    let timer: number | undefined;
-
     const load = async () => {
       try {
         const payload = await getJson<{ servers: DashboardServer[] }>(
@@ -25,12 +23,10 @@ export function DashboardPage() {
     };
 
     void load();
-    timer = window.setInterval(load, 3000);
+    const timer = window.setInterval(load, 3000);
 
     return () => {
-      if (timer) {
-        window.clearInterval(timer);
-      }
+      window.clearInterval(timer);
     };
   }, []);
 

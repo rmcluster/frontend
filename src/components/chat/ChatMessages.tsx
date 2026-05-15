@@ -58,13 +58,11 @@ function ThinkingBlock({
   // Start open; auto-collapse when the </think> tag arrives.
   const [open, setOpen] = useState(true);
   const prevComplete = useRef(false);
-  if (thinkingComplete && !prevComplete.current) {
-    prevComplete.current = true;
-    // Collapse on the render where thinking first completes
-    // (use a ref-based flag to avoid setState during render — schedule it)
-  }
   useEffect(() => {
-    if (thinkingComplete) setOpen(false);
+    if (thinkingComplete && !prevComplete.current) {
+      prevComplete.current = true;
+      setOpen(false);
+    }
   }, [thinkingComplete]);
 
   return (

@@ -26,11 +26,23 @@ function parsePropfind(xml: string, requestedPath: string): DavEntry[] {
     if (normalizedHref === normalizedRequested) continue;
 
     const resourcetype = resp.getElementsByTagNameNS('DAV:', 'resourcetype')[0];
-    const isDirectory = !!resourcetype?.getElementsByTagNameNS('DAV:', 'collection')[0];
+    const isDirectory = !!resourcetype?.getElementsByTagNameNS(
+      'DAV:',
+      'collection'
+    )[0];
 
-    const getlastmodified = resp.getElementsByTagNameNS('DAV:', 'getlastmodified')[0];
-    const getcontentlength = resp.getElementsByTagNameNS('DAV:', 'getcontentlength')[0];
-    const getcontenttype = resp.getElementsByTagNameNS('DAV:', 'getcontenttype')[0];
+    const getlastmodified = resp.getElementsByTagNameNS(
+      'DAV:',
+      'getlastmodified'
+    )[0];
+    const getcontentlength = resp.getElementsByTagNameNS(
+      'DAV:',
+      'getcontentlength'
+    )[0];
+    const getcontenttype = resp.getElementsByTagNameNS(
+      'DAV:',
+      'getcontenttype'
+    )[0];
 
     const rawName = href.replace(/\/$/, '').split('/').pop() ?? href;
 
@@ -45,7 +57,9 @@ function parsePropfind(xml: string, requestedPath: string): DavEntry[] {
       name: rawName,
       path: strippedPath,
       isDirectory,
-      size: getcontentlength?.textContent ? Number(getcontentlength.textContent) : null,
+      size: getcontentlength?.textContent
+        ? Number(getcontentlength.textContent)
+        : null,
       lastModified: getlastmodified?.textContent?.trim() ?? null,
       contentType: getcontenttype?.textContent?.trim() ?? null,
     });
@@ -79,17 +93,25 @@ export async function uploadFile(
     const url = `${DAV_BASE}${dirPath}${dirPath.endsWith('/') ? '' : '/'}${file.name}`;
     xhr.open('PUT', url);
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) onProgress((e.loaded / e.total) * 100);
+      if (e.lengthComputable && onProgress)
+        onProgress((e.loaded / e.total) * 100);
     };
-    xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`PUT ${xhr.status}`)));
+    xhr.onload = () =>
+      xhr.status < 300 ? resolve() : reject(new Error(`PUT ${xhr.status}`));
     xhr.onerror = () => reject(new Error('Upload network error'));
     xhr.send(file);
   });
 }
 
+export async function createFile(path: string): Promise<void> {
+  const res = await fetch(`${DAV_BASE}${path}`, { method: 'PUT', body: '' });
+  if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
+}
+
 export async function createFolder(path: string): Promise<void> {
   const res = await fetch(`${DAV_BASE}${path}`, { method: 'MKCOL' });
-  if (!res.ok && res.status !== 405) throw new Error(`MKCOL failed: ${res.status}`);
+  if (!res.ok && res.status !== 405)
+    throw new Error(`MKCOL failed: ${res.status}`);
 }
 
 export async function deleteEntry(path: string): Promise<void> {
@@ -97,7 +119,10 @@ export async function deleteEntry(path: string): Promise<void> {
   if (!res.ok) throw new Error(`DELETE failed: ${res.status}`);
 }
 
-export async function moveEntry(fromPath: string, toPath: string): Promise<void> {
+export async function moveEntry(
+  fromPath: string,
+  toPath: string
+): Promise<void> {
   const destination = `${window.location.origin}${DAV_BASE}${toPath}`;
   const res = await fetch(`${DAV_BASE}${fromPath}`, {
     method: 'MOVE',

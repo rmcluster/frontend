@@ -1,14 +1,42 @@
 import { useEffect, useState } from 'react';
 import type { DavEntry } from '../../lib/webdav';
-import { downloadUrl, uploadFile } from '../../lib/webdav';
+import { downloadUrl } from '../../lib/webdav';
 import { DAV_BASE } from '../../lib/routes';
 
-const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif', 'bmp']);
+const IMAGE_EXTS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'svg',
+  'avif',
+  'bmp',
+]);
 const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v']);
 const TEXT_EXTS = new Set([
-  'txt', 'md', 'json', 'csv', 'js', 'ts', 'tsx', 'jsx',
-  'py', 'go', 'rs', 'yaml', 'yml', 'toml', 'xml', 'html',
-  'css', 'sh', 'bash', 'env', 'gitignore', 'log',
+  'txt',
+  'md',
+  'json',
+  'csv',
+  'js',
+  'ts',
+  'tsx',
+  'jsx',
+  'py',
+  'go',
+  'rs',
+  'yaml',
+  'yml',
+  'toml',
+  'xml',
+  'html',
+  'css',
+  'sh',
+  'bash',
+  'env',
+  'gitignore',
+  'log',
 ]);
 
 function extOf(name: string) {
@@ -27,7 +55,7 @@ function classify(entry: DavEntry): FileType {
 }
 
 type FileViewerProps = {
-  entry: DavEntry | null;
+  entry: DavEntry;
   onClose: () => void;
 };
 
@@ -38,43 +66,33 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
   const [saved, setSaved] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const kind = classify(entry);
+  const url = downloadUrl(entry.path);
+
   useEffect(() => {
-    if (!entry) return;
-    if (classify(entry) !== 'text') return;
+    if (kind !== 'text') return;
     setLoadingText(true);
     setFetchError(null);
+    setTextContent('');
     fetch(`${DAV_BASE}${entry.path}`)
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`);
         return r.text();
       })
-      .then((t) => setTextContent(t))
-      .catch((e) => setFetchError(e.message))
+      .then(setTextContent)
+      .catch((e: unknown) =>
+        setFetchError(e instanceof Error ? e.message : String(e))
+      )
       .finally(() => setLoadingText(false));
-  }, [entry]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  if (!entry) return null;
-  const kind = classify(entry);
-  const url = downloadUrl(entry.path);
+  }, [entry.path, kind]);
 
   async function handleSave() {
-    if (!entry) return;
     setSaving(true);
     try {
       const blob = new Blob([textContent], { type: 'text/plain' });
-      const file = new File([blob], entry.name);
-      // Use PUT directly since uploadFile builds the path from dir + filename
       const res = await fetch(`${DAV_BASE}${entry.path}`, {
         method: 'PUT',
-        body: file,
+        body: blob,
       });
       if (!res.ok) throw new Error(`PUT ${res.status}`);
       setSaved(true);
@@ -85,94 +103,112 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-black/75 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 bg-[var(--bg-surface)] border-b border-[var(--border)] flex-shrink-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <span className="text-sm font-medium text-[var(--text-primary)] truncate">{entry.name}</span>
-        <div className="flex items-center gap-2 ml-4">
-          {kind === 'text' && (
-            <button
-              onClick={handleSave}
-              disabled={saving || loadingText}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
-            </button>
-          )}
-          <a
-            href={url}
-            download={entry.name}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
-            onClick={(e) => e.stopPropagation()}
+    <div className="flex flex-col">
+      {/* Toolbar inside the card */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer outline-none mr-1"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
           >
-            Download
-          </a>
+            <path
+              d="M10 3L5 8l5 5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Back
+        </button>
+        <span className="text-sm text-[var(--text-primary)] font-medium truncate flex-1">
+          {entry.name}
+        </span>
+        {kind === 'text' && (
           <button
-            onClick={onClose}
-            className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer outline-none"
-            aria-label="Close"
+            onClick={handleSave}
+            disabled={saving || loadingText}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
           </button>
-        </div>
+        )}
+        <a
+          href={url}
+          download={entry.name}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+        >
+          Download
+        </a>
       </div>
 
-      {/* Body */}
-      <div
-        className="flex-1 overflow-auto flex items-center justify-center p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+      {/* Content area */}
+      <div className="p-4">
         {kind === 'image' && (
-          <img
-            src={url}
-            alt={entry.name}
-            className="max-w-full max-h-full object-contain rounded shadow-lg"
-          />
-        )}
-
-        {kind === 'video' && (
-          <video
-            src={url}
-            controls
-            autoPlay={false}
-            className="max-w-full max-h-full rounded shadow-lg"
-          />
-        )}
-
-        {kind === 'text' && (
-          <div className="w-full h-full flex flex-col max-w-4xl mx-auto">
-            {loadingText ? (
-              <div className="flex-1 bg-[var(--bg-surface)] rounded-lg animate-pulse" />
-            ) : fetchError ? (
-              <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">
-                Failed to load file: {fetchError}
-              </div>
-            ) : (
-              <textarea
-                className="flex-1 w-full h-full min-h-[60vh] p-4 text-sm font-mono bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg outline-none focus:border-[var(--accent)] resize-none leading-relaxed"
-                value={textContent}
-                onChange={(e) => setTextContent(e.target.value)}
-                spellCheck={false}
-              />
-            )}
+          <div className="flex items-center justify-center min-h-[320px]">
+            <img
+              src={url}
+              alt={entry.name}
+              className="max-w-full max-h-[70vh] object-contain rounded"
+            />
           </div>
         )}
 
+        {kind === 'video' && (
+          <div className="flex items-center justify-center">
+            <video
+              src={url}
+              controls
+              className="max-w-full max-h-[70vh] rounded"
+            />
+          </div>
+        )}
+
+        {kind === 'text' &&
+          (loadingText ? (
+            <div className="h-64 rounded-lg bg-[var(--bg-elevated)] animate-pulse" />
+          ) : fetchError ? (
+            <div className="flex items-center justify-center py-12 text-sm text-[var(--text-muted)]">
+              Failed to load: {fetchError}
+            </div>
+          ) : (
+            <textarea
+              className="w-full min-h-[60vh] p-4 text-sm font-mono bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg outline-none focus:border-[var(--accent)] resize-y leading-relaxed"
+              value={textContent}
+              onChange={(e) => setTextContent(e.target.value)}
+              spellCheck={false}
+            />
+          ))}
+
         {kind === 'unknown' && (
-          <div className="flex flex-col items-center gap-4 text-[var(--text-muted)]">
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          <div className="flex flex-col items-center gap-4 py-16 text-[var(--text-muted)]">
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M14 2v6h6"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
             </svg>
-            <p className="text-sm">No preview available</p>
+            <p className="text-sm">No preview available for this file type</p>
             <a
               href={url}
               download={entry.name}

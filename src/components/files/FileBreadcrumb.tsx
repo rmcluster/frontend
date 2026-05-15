@@ -15,18 +15,36 @@ export function FileBreadcrumb({ path, onNavigate }: FileBreadcrumbProps) {
   ];
 
   return (
-    <nav className="flex items-center gap-1 text-sm text-[var(--text-secondary)] overflow-x-auto whitespace-nowrap" aria-label="Breadcrumb">
+    <nav
+      className="flex items-center gap-1 text-sm text-[var(--text-secondary)] overflow-x-auto whitespace-nowrap"
+      aria-label="Breadcrumb"
+    >
       {crumbs.map((crumb, i) => {
         const isLast = i === crumbs.length - 1;
         return (
           <span key={crumb.path} className="flex items-center gap-1 min-w-0">
             {i > 0 && (
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 text-[var(--text-muted)]" aria-hidden="true">
-                <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                className="flex-shrink-0 text-[var(--text-muted)]"
+                aria-hidden="true"
+              >
+                <path
+                  d="M5 3l4 4-4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             )}
             {isLast ? (
-              <span className="text-[var(--text-primary)] font-medium truncate">{crumb.label}</span>
+              <span className="text-[var(--text-primary)] font-medium truncate">
+                {crumb.label}
+              </span>
             ) : (
               <button
                 onClick={() => onNavigate(crumb.path)}

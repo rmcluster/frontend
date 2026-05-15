@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { DavEntry } from '../../lib/webdav';
-import { downloadUrl } from '../../lib/webdav';
+import { downloadUrl, moveEntry } from '../../lib/webdav';
 import { DAV_BASE } from '../../lib/routes';
+import { ConfirmModal } from './ConfirmModal';
 
 const IMAGE_EXTS = new Set([
   'jpg',
@@ -40,40 +42,186 @@ const TEXT_EXTS = new Set([
 ]);
 
 function extOf(name: string) {
-  return name.split('.').pop()?.toLowerCase() ?? '';
+  const parts = name.split('.');
+  if (parts.length < 2 || parts[0] === '') return '';
+  return parts.pop()?.toLowerCase() ?? '';
 }
 
 type FileType = 'image' | 'video' | 'text' | 'unknown';
 
-function classify(entry: DavEntry): FileType {
-  const ext = extOf(entry.name);
-  const mime = entry.contentType?.split(';')[0].trim() ?? '';
+function classify(name: string, contentType: string | null): FileType {
+  const ext = extOf(name);
+  const mime = contentType?.split(';')[0].trim() ?? '';
   if (mime.startsWith('image/') || IMAGE_EXTS.has(ext)) return 'image';
   if (mime.startsWith('video/') || VIDEO_EXTS.has(ext)) return 'video';
   if (mime.startsWith('text/') || TEXT_EXTS.has(ext)) return 'text';
-  return 'unknown';
+  // Default to text editor for unknown / no-extension files
+  return 'text';
 }
+
+// ── CSV viewer ────────────────────────────────────────────────────────────────
+
+function parseCsv(raw: string): string[][] {
+  return raw
+    .split('\n')
+    .filter((l) => l.trim() !== '')
+    .map((line) => {
+      const cols: string[] = [];
+      let cur = '';
+      let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else inQ = !inQ;
+        } else if (ch === ',' && !inQ) {
+          cols.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      cols.push(cur);
+      return cols;
+    });
+}
+
+function CsvTable({ raw }: { raw: string }) {
+  const rows = parseCsv(raw);
+  if (rows.length === 0)
+    return <p className="text-sm text-[var(--text-muted)]">Empty CSV</p>;
+  const [header, ...body] = rows;
+  return (
+    <div className="overflow-auto rounded-lg border border-[var(--border)]">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wide">
+            {header.map((h, i) => (
+              <th
+                key={i}
+                className="text-left px-3 py-2 font-semibold border-b border-[var(--border)] whitespace-nowrap"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, ri) => (
+            <tr
+              key={ri}
+              className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors"
+            >
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-3 py-1.5 text-[var(--text-primary)]">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── JSON viewer ───────────────────────────────────────────────────────────────
+
+function JsonPreview({ raw }: { raw: string }) {
+  let pretty: string;
+  let error: string | null = null;
+  try {
+    pretty = JSON.stringify(JSON.parse(raw), null, 2);
+  } catch (e) {
+    pretty = raw;
+    error = e instanceof Error ? e.message : 'Invalid JSON';
+  }
+  return (
+    <div>
+      {error && (
+        <div className="mb-2 px-3 py-1.5 rounded-md bg-[var(--danger,#ef4444)]/10 text-[var(--danger,#ef4444)] text-xs font-mono">
+          {error}
+        </div>
+      )}
+      <pre className="overflow-auto rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] text-sm font-mono p-4 leading-relaxed whitespace-pre-wrap break-words">
+        {pretty}
+      </pre>
+    </div>
+  );
+}
+
+// ── FileViewer ────────────────────────────────────────────────────────────────
 
 type FileViewerProps = {
   entry: DavEntry;
   onClose: () => void;
+  onRename: (updated: DavEntry) => void;
+  fileMode?: 'preview' | 'edit' | null;
+  onFileModeChange?: (mode: 'preview' | 'edit') => void;
 };
 
-export function FileViewer({ entry, onClose }: FileViewerProps) {
+export function FileViewer({
+  entry,
+  onClose,
+  onRename,
+  fileMode,
+  onFileModeChange,
+}: FileViewerProps) {
   const [textContent, setTextContent] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
   const [loadingText, setLoadingText] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const kind = classify(entry);
+  // preview vs edit toggle for structured types
+  const ext = extOf(entry.name);
+  const isStructured = ext === 'csv' || ext === 'json' || ext === 'md';
+  const defaultPreview = isStructured;
+  const [preview, setPreview] = useState(
+    fileMode != null ? fileMode === 'preview' : defaultPreview
+  );
+
+  // Sync preview when URL-driven fileMode changes (e.g. after reload)
+  useEffect(() => {
+    if (fileMode != null) setPreview(fileMode === 'preview');
+  }, [fileMode]);
+
+  // Inline rename state
+  const [renamingTitle, setRenamingTitle] = useState(false);
+  const [renameValue, setRenameValue] = useState(entry.name);
+  const [renaming, setRenaming] = useState(false);
+  // null = no warning; string = new name that triggered warning
+  const [extWarnNewName, setExtWarnNewName] = useState<string | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const kind = classify(entry.name, entry.contentType);
   const url = downloadUrl(entry.path);
+
+  useEffect(() => {
+    setRenameValue(entry.name);
+  }, [entry.name]);
+
+  // Warn before browser refresh/close when there are unsaved edits
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   useEffect(() => {
     if (kind !== 'text') return;
     setLoadingText(true);
     setFetchError(null);
     setTextContent('');
+    setIsDirty(false);
     fetch(`${DAV_BASE}${entry.path}`)
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`);
@@ -86,6 +234,54 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
       .finally(() => setLoadingText(false));
   }, [entry.path, kind]);
 
+  function togglePreview(p: boolean) {
+    setPreview(p);
+    onFileModeChange?.(p ? 'preview' : 'edit');
+  }
+
+  function startRenameTitle() {
+    setRenameValue(entry.name);
+    setRenamingTitle(true);
+    setExtWarnNewName(null);
+    setTimeout(() => titleInputRef.current?.select(), 0);
+  }
+
+  function cancelRenameTitle() {
+    setRenamingTitle(false);
+    setRenameValue(entry.name);
+    setExtWarnNewName(null);
+  }
+
+  async function doRenameTitle(name: string) {
+    setRenaming(true);
+    const parentPath = entry.path.replace(/\/?[^/]+\/?$/, '/');
+    const toPath = `${parentPath}${name}`;
+    await moveEntry(entry.path, toPath);
+    setRenaming(false);
+    setRenamingTitle(false);
+    setExtWarnNewName(null);
+    onRename({ ...entry, name, path: toPath });
+  }
+
+  async function commitRenameTitle() {
+    if (renaming || extWarnNewName) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === entry.name) {
+      cancelRenameTitle();
+      return;
+    }
+
+    const oldExt = extOf(entry.name);
+    const newExt = extOf(trimmed);
+    // Only warn when changing from one real extension to a different one
+    if (oldExt && newExt && oldExt !== newExt) {
+      setExtWarnNewName(trimmed);
+      return;
+    }
+
+    await doRenameTitle(trimmed);
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -95,6 +291,7 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
         body: blob,
       });
       if (!res.ok) throw new Error(`PUT ${res.status}`);
+      setIsDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -104,51 +301,200 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
 
   return (
     <div className="flex flex-col">
-      {/* Toolbar inside the card */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-elevated)]">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer outline-none mr-1"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M10 3L5 8l5 5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Back
-        </button>
-        <span className="text-sm text-[var(--text-primary)] font-medium truncate flex-1">
-          {entry.name}
-        </span>
-        {kind === 'text' && (
+      {/* Toolbar */}
+      <div className="flex flex-col border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+        <div className="flex items-center gap-2 px-3 py-2">
           <button
-            onClick={handleSave}
-            disabled={saving || loadingText}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => (isDirty ? setShowLeaveWarning(true) : onClose())}
+            className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer outline-none shrink-0 mr-1"
           >
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M10 3L5 8l5 5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Back
           </button>
-        )}
-        <a
-          href={url}
-          download={entry.name}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
-        >
-          Download
-        </a>
+
+          {/* Inline filename / rename */}
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            {renamingTitle ? (
+              <>
+                <input
+                  ref={titleInputRef}
+                  autoFocus
+                  className="flex-1 min-w-0 text-sm px-2 py-0.5 bg-[var(--bg-input)] border border-[var(--accent)] rounded outline-none text-[var(--text-primary)]"
+                  value={renameValue}
+                  onChange={(e) => {
+                    setRenameValue(e.target.value);
+                    setExtWarnNewName(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitRenameTitle();
+                    }
+                    if (e.key === 'Escape') cancelRenameTitle();
+                  }}
+                />
+                <button
+                  onClick={commitRenameTitle}
+                  disabled={renaming}
+                  className="shrink-0 p-1 rounded text-[var(--accent)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer outline-none disabled:opacity-50"
+                  aria-label="Save rename"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M2 7l4 4 6-7"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <button
+                  onClick={cancelRenameTitle}
+                  className="shrink-0 p-1 rounded text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors cursor-pointer outline-none"
+                  aria-label="Cancel rename"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 3l8 8M11 3L3 11"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={startRenameTitle}
+                title="Click to rename"
+                className="flex items-center gap-1.5 min-w-0 group cursor-pointer outline-none"
+              >
+                <span className="text-sm text-[var(--text-primary)] font-medium truncate">
+                  {entry.name}
+                </span>
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 13 13"
+                  fill="none"
+                  className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-[var(--text-secondary)]"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M9 1.5l2.5 2.5-7 7H2V8.5l7-7z"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Preview/Edit toggle for structured types */}
+          {kind === 'text' && isStructured && !loadingText && !fetchError && (
+            <div className="shrink-0 flex items-center rounded-md border border-[var(--border)] overflow-hidden text-xs">
+              <button
+                onClick={() => togglePreview(true)}
+                className={`px-2.5 py-1 cursor-pointer outline-none transition-colors ${preview ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              >
+                Preview
+              </button>
+              <button
+                onClick={() => togglePreview(false)}
+                className={`px-2.5 py-1 cursor-pointer outline-none transition-colors ${!preview ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              >
+                Edit
+              </button>
+            </div>
+          )}
+
+          {kind === 'text' && !preview && (
+            <button
+              onClick={handleSave}
+              disabled={saving || loadingText}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+            </button>
+          )}
+          <a
+            href={url}
+            download={entry.name}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+          >
+            Download
+          </a>
+        </div>
       </div>
 
-      {/* Content area */}
+      <ConfirmModal
+        open={showLeaveWarning}
+        title="Unsaved changes"
+        message="You have unsaved changes. What would you like to do?"
+        onClose={() => setShowLeaveWarning(false)}
+        actions={[
+          { label: 'Leave anyway', variant: 'danger', onClick: onClose },
+          {
+            label: saving ? 'Saving…' : 'Save & leave',
+            variant: 'primary',
+            disabled: saving,
+            onClick: async () => {
+              await handleSave();
+              onClose();
+            },
+          },
+        ]}
+      />
+
+      <ConfirmModal
+        open={extWarnNewName !== null}
+        title="Change file type"
+        message={
+          extWarnNewName
+            ? `Change extension from .${extOf(entry.name)} to .${extOf(extWarnNewName)}?`
+            : ''
+        }
+        onClose={() => setExtWarnNewName(null)}
+        actions={[
+          {
+            label: 'Change extension',
+            variant: 'primary',
+            onClick: () => {
+              if (extWarnNewName) doRenameTitle(extWarnNewName);
+            },
+          },
+        ]}
+      />
+
+      {/* Content */}
       <div className="p-4">
         {kind === 'image' && (
           <div className="flex items-center justify-center min-h-[320px]">
@@ -159,7 +505,6 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
             />
           </div>
         )}
-
         {kind === 'video' && (
           <div className="flex items-center justify-center">
             <video
@@ -169,7 +514,6 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
             />
           </div>
         )}
-
         {kind === 'text' &&
           (loadingText ? (
             <div className="h-64 rounded-lg bg-[var(--bg-elevated)] animate-pulse" />
@@ -177,47 +521,92 @@ export function FileViewer({ entry, onClose }: FileViewerProps) {
             <div className="flex items-center justify-center py-12 text-sm text-[var(--text-muted)]">
               Failed to load: {fetchError}
             </div>
+          ) : preview && ext === 'csv' ? (
+            <CsvTable raw={textContent} />
+          ) : preview && ext === 'json' ? (
+            <JsonPreview raw={textContent} />
+          ) : preview && ext === 'md' ? (
+            <div className="max-w-none">
+              <ReactMarkdown
+                components={{
+                  h1: ({ children }) => (
+                    <h1 className="text-2xl font-bold mt-6 mb-3 text-[var(--text-primary)] border-b border-[var(--border)] pb-2">
+                      {children}
+                    </h1>
+                  ),
+                  h2: ({ children }) => (
+                    <h2 className="text-xl font-bold mt-5 mb-2 text-[var(--text-primary)]">
+                      {children}
+                    </h2>
+                  ),
+                  h3: ({ children }) => (
+                    <h3 className="text-lg font-semibold mt-4 mb-2 text-[var(--text-primary)]">
+                      {children}
+                    </h3>
+                  ),
+                  p: ({ children }) => (
+                    <p className="mb-3 text-sm leading-relaxed text-[var(--text-primary)]">
+                      {children}
+                    </p>
+                  ),
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      className="text-[var(--accent)] hover:underline"
+                    >
+                      {children}
+                    </a>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="mb-3 ml-5 list-disc text-sm text-[var(--text-primary)]">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="mb-3 ml-5 list-decimal text-sm text-[var(--text-primary)]">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  code: ({ children, className }) =>
+                    className ? (
+                      <code className="block overflow-auto rounded bg-[var(--bg-elevated)] text-[var(--text-primary)] text-xs font-mono p-3 mb-3">
+                        {children}
+                      </code>
+                    ) : (
+                      <code className="text-xs font-mono bg-[var(--bg-elevated)] text-[var(--accent)] px-1 py-0.5 rounded">
+                        {children}
+                      </code>
+                    ),
+                  pre: ({ children }) => <pre className="mb-3">{children}</pre>,
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-[var(--border)] pl-4 text-[var(--text-muted)] italic mb-3">
+                      {children}
+                    </blockquote>
+                  ),
+                  hr: () => <hr className="my-4 border-[var(--border)]" />,
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-[var(--text-primary)]">
+                      {children}
+                    </strong>
+                  ),
+                  em: ({ children }) => <em className="italic">{children}</em>,
+                }}
+              >
+                {textContent}
+              </ReactMarkdown>
+            </div>
           ) : (
             <textarea
               className="w-full min-h-[60vh] p-4 text-sm font-mono bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] rounded-lg outline-none focus:border-[var(--accent)] resize-y leading-relaxed"
               value={textContent}
-              onChange={(e) => setTextContent(e.target.value)}
+              onChange={(e) => {
+                setTextContent(e.target.value);
+                setIsDirty(true);
+              }}
               spellCheck={false}
             />
           ))}
-
-        {kind === 'unknown' && (
-          <div className="flex flex-col items-center gap-4 py-16 text-[var(--text-muted)]">
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M14 2v6h6"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <p className="text-sm">No preview available for this file type</p>
-            <a
-              href={url}
-              download={entry.name}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
-            >
-              Download file
-            </a>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -123,10 +123,12 @@ export async function moveEntry(
   fromPath: string,
   toPath: string
 ): Promise<void> {
-  const destination = `${window.location.origin}${DAV_BASE}${toPath}`;
+  // Go's webdav package validates that Destination host == r.Host.
+  // Sending a path-only value (no scheme/host) passes the check regardless
+  // of how the Vite proxy rewrites the host.
   const res = await fetch(`${DAV_BASE}${fromPath}`, {
     method: 'MOVE',
-    headers: { Destination: destination, Overwrite: 'F' },
+    headers: { Destination: `${DAV_BASE}${toPath}`, Overwrite: 'F' },
   });
   if (!res.ok) throw new Error(`MOVE failed: ${res.status}`);
 }

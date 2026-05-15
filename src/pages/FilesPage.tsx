@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { listDir, createFolder, createFile } from '../lib/webdav';
 import type { DavEntry } from '../lib/webdav';
 import { PageHeader } from '../components/PageHeader';
@@ -10,7 +11,13 @@ import { NewFileModal } from '../components/files/NewFileModal';
 import { UploadButton } from '../components/files/UploadButton';
 
 export function FilesPage() {
-  const [currentPath, setCurrentPath] = useState('/');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // currentPath is derived from ?path= so reload and browser back/forward work
+  const currentPath = searchParams.get('path') ?? '/';
+
+  const filePath = searchParams.get('file');
+  const fileMode = searchParams.get('mode') as 'preview' | 'edit' | null;
+
   const [entries, setEntries] = useState<DavEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +43,55 @@ export function FilesPage() {
     load();
   }, [load]);
 
+  // Restore viewed file from URL after directory entries load
+  useEffect(() => {
+    if (!filePath || viewingEntry) return;
+    const found = entries.find((e) => e.path === filePath);
+    if (found) setViewingEntry(found);
+    // viewingEntry intentionally omitted — only run when entries/filePath change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, filePath]);
+
+  function buildParams(overrides: Record<string, string | null>) {
+    const params: Record<string, string> = {};
+    if (currentPath !== '/') params.path = currentPath;
+    if (filePath) params.file = filePath;
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v === null) delete params[k];
+      else params[k] = v;
+    }
+    return params;
+  }
+
+  function navigate(path: string) {
+    setViewingEntry(null);
+    if (path === '/') {
+      setSearchParams({}, { replace: false });
+    } else {
+      setSearchParams({ path }, { replace: false });
+    }
+  }
+
+  function openFile(entry: DavEntry) {
+    setViewingEntry(entry);
+    setSearchParams(buildParams({ file: entry.path }), { replace: false });
+  }
+
+  function closeViewer() {
+    setViewingEntry(null);
+    setSearchParams(buildParams({ file: null }), { replace: false });
+  }
+
+  function handleFileModeChange(mode: 'preview' | 'edit') {
+    setSearchParams(buildParams({ mode }), { replace: true });
+  }
+
+  function handleViewerRename(updated: DavEntry) {
+    setViewingEntry(updated);
+    // replace so back-button doesn't restore the old filename in the URL
+    setSearchParams(buildParams({ file: updated.path }), { replace: true });
+  }
+
   async function handleCreateFolder(name: string) {
     const path = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${name}/`;
     await createFolder(path);
@@ -46,20 +102,15 @@ export function FilesPage() {
     const path = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${name}`;
     await createFile(path);
     await load();
-    // Open the new file in the editor immediately
-    setViewingEntry({
+    const entry: DavEntry = {
       name,
       path,
       isDirectory: false,
       size: 0,
-      lastModified: null,
+      lastModified: new Date().toISOString(),
       contentType: null,
-    });
-  }
-
-  function navigate(path: string) {
-    setViewingEntry(null);
-    setCurrentPath(path);
+    };
+    openFile(entry);
   }
 
   const isViewing = viewingEntry !== null;
@@ -225,7 +276,10 @@ export function FilesPage() {
         {isViewing ? (
           <FileViewer
             entry={viewingEntry}
-            onClose={() => setViewingEntry(null)}
+            onClose={closeViewer}
+            onRename={handleViewerRename}
+            fileMode={fileMode}
+            onFileModeChange={handleFileModeChange}
           />
         ) : loading ? (
           <div className="flex flex-col gap-2 p-4">
@@ -272,7 +326,7 @@ export function FilesPage() {
             entries={entries}
             viewMode={viewMode}
             onNavigate={navigate}
-            onOpenFile={setViewingEntry}
+            onOpenFile={openFile}
             onRefresh={load}
           />
         )}

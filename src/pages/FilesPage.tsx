@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { listDir, createFolder, createFile } from '../lib/webdav';
+import { listDir, createFolder, createFile, moveEntry } from '../lib/webdav';
 import type { DavEntry } from '../lib/webdav';
 import { PageHeader } from '../components/PageHeader';
 import { FileBreadcrumb } from '../components/files/FileBreadcrumb';
@@ -25,6 +25,7 @@ export function FilesPage() {
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [fileModalOpen, setFileModalOpen] = useState(false);
   const [viewingEntry, setViewingEntry] = useState<DavEntry | null>(null);
+  const [renameSignal, setRenameSignal] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,6 +41,7 @@ export function FilesPage() {
   }, [currentPath]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -47,6 +49,7 @@ export function FilesPage() {
   useEffect(() => {
     if (!filePath || viewingEntry) return;
     const found = entries.find((e) => e.path === filePath);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (found) setViewingEntry(found);
     // viewingEntry intentionally omitted — only run when entries/filePath change
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,6 +93,16 @@ export function FilesPage() {
     setViewingEntry(updated);
     // replace so back-button doesn't restore the old filename in the URL
     setSearchParams(buildParams({ file: updated.path }), { replace: true });
+  }
+
+  async function handleDropToPath(
+    entry: { path: string; name: string; isDirectory: boolean },
+    targetPath: string
+  ) {
+    const toPath = `${targetPath}${entry.name}${entry.isDirectory ? '/' : ''}`;
+    if (toPath === entry.path) return;
+    await moveEntry(entry.path, toPath);
+    await load();
   }
 
   async function handleCreateFolder(name: string) {
@@ -181,7 +194,13 @@ export function FilesPage() {
       />
 
       <div className="mt-4 mb-3 flex items-center justify-between gap-4">
-        <FileBreadcrumb path={currentPath} onNavigate={navigate} />
+        <FileBreadcrumb
+          path={currentPath}
+          onNavigate={navigate}
+          fileSegment={viewingEntry?.name}
+          onRenameFile={viewingEntry ? () => setRenameSignal((s) => s + 1) : undefined}
+          onDropToPath={handleDropToPath}
+        />
         {!isViewing && (
           <div className="flex items-center gap-1 flex-shrink-0">
             <button
@@ -280,6 +299,7 @@ export function FilesPage() {
             onRename={handleViewerRename}
             fileMode={fileMode}
             onFileModeChange={handleFileModeChange}
+            renameSignal={renameSignal}
           />
         ) : loading ? (
           <div className="flex flex-col gap-2 p-4">

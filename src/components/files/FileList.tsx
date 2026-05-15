@@ -1,8 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { DavEntry } from '../../lib/webdav';
 import { downloadUrl, deleteEntry, moveEntry } from '../../lib/webdav';
-import { fileIconForEntry } from './FileIcon';
+import { FileEntryIcon } from './FileIcon';
 import { ConfirmModal } from './ConfirmModal';
+import { MoveToModal } from './MoveToModal';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '../ui/DropdownMenu';
 
 type ViewMode = 'list' | 'grid';
 
@@ -58,102 +66,44 @@ type EntryActionsProps = {
   onRename: () => void;
   onDelete: () => void;
   onView: () => void;
+  onMoveTo: () => void;
 };
 
-function EntryActions({
-  entry,
-  onRename,
-  onDelete,
-  onView,
-}: EntryActionsProps) {
-  const [open, setOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(
-    null
-  );
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  function handleOpen() {
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setMenuPos({
-        top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
-      });
-    }
-    setOpen(true);
-  }
-
+function EntryActions({ entry, onRename, onDelete, onView, onMoveTo }: EntryActionsProps) {
   return (
-    <>
-      <button
-        ref={buttonRef}
-        onClick={handleOpen}
-        className="p-1.5 rounded hover:bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer outline-none"
-        aria-label="Actions"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="currentColor"
-          aria-hidden="true"
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="p-1.5 rounded hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer outline-none"
+          aria-label="Actions"
         >
-          <circle cx="8" cy="3" r="1.2" />
-          <circle cx="8" cy="8" r="1.2" />
-          <circle cx="8" cy="13" r="1.2" />
-        </svg>
-      </button>
-
-      {open && menuPos && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div
-            className="fixed z-50 w-40 bg-[var(--bg-surface)] border border-[var(--border)] rounded-md shadow-[var(--shadow-lg)] py-1 text-sm"
-            style={{ top: menuPos.top, right: menuPos.right }}
-          >
-            {!entry.isDirectory && (
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onView();
-                }}
-                className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer outline-none"
-              >
-                Open
-              </button>
-            )}
-            {!entry.isDirectory && (
-              <a
-                href={downloadUrl(entry.path)}
-                download={entry.name}
-                className="flex items-center gap-2 px-3 py-1.5 text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                Download
-              </a>
-            )}
-            <button
-              onClick={() => {
-                setOpen(false);
-                onRename();
-              }}
-              className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer outline-none"
-            >
-              Rename
-            </button>
-            <button
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-              className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-[var(--danger)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer outline-none"
-            >
-              Delete
-            </button>
-          </div>
-        </>
-      )}
-    </>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <circle cx="8" cy="3" r="1.2" />
+            <circle cx="8" cy="8" r="1.2" />
+            <circle cx="8" cy="13" r="1.2" />
+          </svg>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {!entry.isDirectory && (
+          <DropdownMenuItem onSelect={onView}>Open</DropdownMenuItem>
+        )}
+        {!entry.isDirectory && (
+          <DropdownMenuItem asChild>
+            <a href={downloadUrl(entry.path)} download={entry.name}>
+              Download
+            </a>
+          </DropdownMenuItem>
+        )}
+        {!entry.isDirectory && <DropdownMenuSeparator />}
+        <DropdownMenuItem onSelect={onRename}>Rename</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onMoveTo}>Move to…</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="danger" onSelect={onDelete}>
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -166,6 +116,11 @@ type FileRowProps = {
   onNavigate: (path: string) => void;
   onOpenFile: (entry: DavEntry) => void;
   onRefresh: () => void;
+  draggingRef: React.RefObject<DavEntry | null>;
+  dragOverPath: string | null;
+  setDragOverPath: (p: string | null) => void;
+  onDropOnFolder: (target: DavEntry) => void;
+  onMoveTo: () => void;
 };
 
 function FileRow({
@@ -175,18 +130,17 @@ function FileRow({
   onNavigate,
   onOpenFile,
   onRefresh,
+  draggingRef,
+  dragOverPath,
+  setDragOverPath,
+  onDropOnFolder,
+  onMoveTo,
 }: FileRowProps) {
   const renaming = renamingPath === entry.path;
   const [newName, setNewName] = useState(entry.name);
   const [committing, setCommitting] = useState(false);
   const [extWarnNewName, setExtWarnNewName] = useState<string | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
-
-  const Icon = fileIconForEntry(
-    entry.isDirectory,
-    entry.name,
-    entry.contentType
-  );
 
   function startRename() {
     setNewName(entry.name);
@@ -245,13 +199,58 @@ function FileRow({
     onRefresh();
   }
 
+  const isDragTarget = dragOverPath === entry.path;
+
+  function handleDragStart(e: React.DragEvent) {
+    draggingRef.current = entry;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(
+      'application/panzerschreck-entry',
+      JSON.stringify({ path: entry.path, name: entry.name, isDirectory: entry.isDirectory })
+    );
+  }
+
+  function handleDragEnd() {
+    draggingRef.current = null;
+    setDragOverPath(null);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    const dragging = draggingRef.current;
+    if (!dragging || dragging.path === entry.path) return;
+    if (dragging.isDirectory && entry.path.startsWith(dragging.path)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverPath(entry.path);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverPath(null);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOverPath(null);
+    onDropOnFolder(entry);
+  }
+
   return (
-    <tr className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors group">
-      <td className="py-2 px-3">
+    <tr
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={entry.isDirectory ? handleDragOver : undefined}
+      onDragLeave={entry.isDirectory ? handleDragLeave : undefined}
+      onDrop={entry.isDirectory ? handleDrop : undefined}
+      className={`border-b border-(--border-subtle) transition-colors group ${isDragTarget ? 'bg-(--accent)/10 ring-2 ring-inset ring-(--accent)' : 'hover:bg-(--bg-elevated)'}`}
+    >
+      <td className="px-4 py-3">
         {renaming ? (
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5">
-              <Icon size={18} className="flex-shrink-0" />
+              <FileEntryIcon isDirectory={entry.isDirectory} name={entry.name} contentType={entry.contentType} size={18} className="shrink-0" />
               <input
                 autoFocus
                 className="flex-1 min-w-0 text-sm px-2 py-0.5 bg-[var(--bg-input)] border border-[var(--accent)] rounded outline-none text-[var(--text-primary)]"
@@ -354,26 +353,27 @@ function FileRow({
             }
             className="flex items-center gap-2.5 text-left text-[var(--text-primary)] cursor-pointer outline-none w-full"
           >
-            <Icon size={18} className="flex-shrink-0" />
+            <FileEntryIcon isDirectory={entry.isDirectory} name={entry.name} contentType={entry.contentType} size={18} className="shrink-0" />
             <span className="truncate">{entry.name}</span>
           </button>
         )}
       </td>
-      <td className="py-2 px-3 text-right text-[var(--text-muted)] hidden sm:table-cell">
+      <td className="px-4 py-3 text-right font-(--font-mono) text-[0.8125rem] text-(--text-muted) hidden sm:table-cell">
         {formatType(entry)}
       </td>
-      <td className="py-2 px-3 text-right text-[var(--text-muted)] tabular-nums hidden sm:table-cell">
+      <td className="px-4 py-3 text-right font-(--font-mono) text-[0.8125rem] text-(--text-muted) tabular-nums hidden sm:table-cell">
         {entry.isDirectory ? '—' : formatSize(entry.size)}
       </td>
-      <td className="py-2 px-3 text-right text-[var(--text-muted)] hidden md:table-cell">
+      <td className="px-4 py-3 text-right font-(--font-mono) text-[0.8125rem] text-(--text-muted) hidden md:table-cell">
         {formatDate(entry.lastModified)}
       </td>
-      <td className="py-2 px-1">
+      <td className="px-2 py-3">
         <EntryActions
           entry={entry}
           onRename={startRename}
           onDelete={handleDelete}
           onView={() => onOpenFile(entry)}
+          onMoveTo={onMoveTo}
         />
       </td>
     </tr>
@@ -477,6 +477,34 @@ export function FileList({
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const draggingRef = useRef<DavEntry | null>(null);
+  const [dragOverPath, setDragOverPath] = useState<string | null>(null);
+  const [movingEntry, setMovingEntry] = useState<DavEntry | null>(null);
+
+  async function handleMoveToPath(targetFolderPath: string) {
+    if (!movingEntry) return;
+    const toPath = `${targetFolderPath}${movingEntry.name}${movingEntry.isDirectory ? '/' : ''}`;
+    await moveEntry(movingEntry.path, toPath);
+    setMovingEntry(null);
+    onRefresh();
+  }
+
+  const handleDropOnFolder = useCallback(
+    async (target: DavEntry) => {
+      const dragged = draggingRef.current;
+      if (!dragged || dragged.path === target.path) return;
+      if (dragged.isDirectory && target.path.startsWith(dragged.path)) return;
+      const name = dragged.name;
+      const toPath = `${target.path}${name}${dragged.isDirectory ? '/' : ''}`;
+      try {
+        await moveEntry(dragged.path, toPath);
+        onRefresh();
+      } catch {
+        // silently ignore — user can retry
+      }
+    },
+    [onRefresh]
+  );
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -487,116 +515,131 @@ export function FileList({
     }
   }
 
-  if (entries.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-[var(--text-muted)] gap-3">
-        <svg
-          width="48"
-          height="48"
-          viewBox="0 0 24 24"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
-        </svg>
-        <span className="text-sm">This folder is empty</span>
-      </div>
-    );
-  }
+  const sorted = entries.length > 0 ? sortEntries(entries, sortKey, sortDir) : [];
 
-  const sorted = sortEntries(entries, sortKey, sortDir);
-
-  if (viewMode === 'grid') {
-    return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 p-2">
-        {sorted.map((entry) => {
-          const Icon = fileIconForEntry(
-            entry.isDirectory,
-            entry.name,
-            entry.contentType
-          );
-          return (
-            <button
-              key={entry.path}
-              onClick={() =>
-                entry.isDirectory ? onNavigate(entry.path) : onOpenFile(entry)
-              }
-              className="group flex flex-col items-center gap-2 p-3 rounded-[var(--radius-lg)] border border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer outline-none text-center"
-            >
-              <Icon size={40} />
-              <span className="text-xs text-[var(--text-primary)] line-clamp-2 break-all leading-tight w-full">
-                {entry.name}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
-  const thClass =
-    'text-right py-2 px-3 font-semibold select-none cursor-pointer hover:text-[var(--text-primary)] transition-colors';
+  const thBase =
+    'font-(--font-mono) text-[0.72rem] uppercase tracking-[0.08em] text-(--text-muted) px-4 py-3 border-b border-(--border) select-none cursor-pointer hover:text-(--text-primary) transition-colors';
 
   return (
-    <table className="w-full text-sm border-collapse">
-      <thead>
-        <tr className="border-b border-[var(--border-subtle)] text-xs text-[var(--text-muted)] uppercase tracking-wide">
-          <th
-            className="text-left py-2 px-3 font-semibold select-none cursor-pointer hover:text-[var(--text-primary)] transition-colors"
-            onClick={() => handleSort('name')}
-          >
-            <span className="inline-flex items-center gap-1">
-              Name <SortIcon active={sortKey === 'name'} dir={sortDir} />
-            </span>
-          </th>
-          <th
-            className={`${thClass} w-20 hidden sm:table-cell`}
-            onClick={() => handleSort('type')}
-          >
-            <span className="inline-flex items-center justify-end gap-1">
-              Type <SortIcon active={sortKey === 'type'} dir={sortDir} />
-            </span>
-          </th>
-          <th
-            className={`${thClass} w-24 hidden sm:table-cell`}
-            onClick={() => handleSort('size')}
-          >
-            <span className="inline-flex items-center justify-end gap-1">
-              Size <SortIcon active={sortKey === 'size'} dir={sortDir} />
-            </span>
-          </th>
-          <th
-            className={`${thClass} w-36 hidden md:table-cell`}
-            onClick={() => handleSort('modified')}
-          >
-            <span className="inline-flex items-center justify-end gap-1">
-              Modified{' '}
-              <SortIcon active={sortKey === 'modified'} dir={sortDir} />
-            </span>
-          </th>
-          <th className="w-10">
-            <span className="sr-only">Actions</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sorted.map((entry) => (
-          <FileRow
-            key={entry.path}
-            entry={entry}
-            renamingPath={renamingPath}
-            setRenamingPath={setRenamingPath}
-            onNavigate={onNavigate}
-            onOpenFile={onOpenFile}
-            onRefresh={onRefresh}
-          />
-        ))}
-      </tbody>
-    </table>
+    <div className="contents">
+      {entries.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-(--text-muted) gap-3">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
+          <span className="text-sm">This folder is empty</span>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 p-2">
+          {sorted.map((entry) => {
+            const isDragTarget = dragOverPath === entry.path;
+            return (
+              <button
+                key={entry.path}
+                draggable
+                onClick={() => entry.isDirectory ? onNavigate(entry.path) : onOpenFile(entry)}
+                onDragStart={(e) => {
+                  draggingRef.current = entry;
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData(
+                    'application/panzerschreck-entry',
+                    JSON.stringify({ path: entry.path, name: entry.name, isDirectory: entry.isDirectory })
+                  );
+                }}
+                onDragEnd={() => {
+                  draggingRef.current = null;
+                  setDragOverPath(null);
+                }}
+                onDragOver={entry.isDirectory ? (e) => {
+                  const dragging = draggingRef.current;
+                  if (!dragging || dragging.path === entry.path) return;
+                  if (dragging.isDirectory && entry.path.startsWith(dragging.path)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setDragOverPath(entry.path);
+                } : undefined}
+                onDragLeave={entry.isDirectory ? (e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverPath(null);
+                } : undefined}
+                onDrop={entry.isDirectory ? (e) => {
+                  e.preventDefault();
+                  setDragOverPath(null);
+                  handleDropOnFolder(entry);
+                } : undefined}
+                className={`group flex flex-col items-center gap-2 p-3 rounded-lg border transition-colors cursor-pointer outline-none text-center ${
+                  isDragTarget
+                    ? 'border-(--accent) bg-(--accent)/10 ring-2 ring-(--accent)'
+                    : 'border-transparent hover:border-(--border) hover:bg-(--bg-elevated)'
+                }`}
+              >
+                <FileEntryIcon isDirectory={entry.isDirectory} name={entry.name} contentType={entry.contentType} size={40} />
+                <span className="text-xs text-(--text-primary) line-clamp-2 break-all leading-tight w-full">
+                  {entry.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr>
+              <th className={`${thBase} text-left`} onClick={() => handleSort('name')}>
+                <span className="inline-flex items-center gap-1">
+                  Name <SortIcon active={sortKey === 'name'} dir={sortDir} />
+                </span>
+              </th>
+              <th className={`${thBase} text-right w-20 hidden sm:table-cell`} onClick={() => handleSort('type')}>
+                <span className="inline-flex items-center justify-end gap-1">
+                  Type <SortIcon active={sortKey === 'type'} dir={sortDir} />
+                </span>
+              </th>
+              <th className={`${thBase} text-right w-24 hidden sm:table-cell`} onClick={() => handleSort('size')}>
+                <span className="inline-flex items-center justify-end gap-1">
+                  Size <SortIcon active={sortKey === 'size'} dir={sortDir} />
+                </span>
+              </th>
+              <th className={`${thBase} text-right w-36 hidden md:table-cell`} onClick={() => handleSort('modified')}>
+                <span className="inline-flex items-center justify-end gap-1">
+                  Modified <SortIcon active={sortKey === 'modified'} dir={sortDir} />
+                </span>
+              </th>
+              <th className="w-10 border-b border-(--border)">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((entry) => (
+              <FileRow
+                key={entry.path}
+                entry={entry}
+                renamingPath={renamingPath}
+                setRenamingPath={setRenamingPath}
+                onNavigate={onNavigate}
+                onOpenFile={onOpenFile}
+                onRefresh={onRefresh}
+                draggingRef={draggingRef}
+                dragOverPath={dragOverPath}
+                setDragOverPath={setDragOverPath}
+                onDropOnFolder={handleDropOnFolder}
+                onMoveTo={() => setMovingEntry(entry)}
+              />
+            ))}
+          </tbody>
+        </table>
+      )}
+      <MoveToModal
+        open={movingEntry !== null}
+        entry={movingEntry}
+        onClose={() => setMovingEntry(null)}
+        onMove={handleMoveToPath}
+      />
+    </div>
   );
 }
 

@@ -171,3 +171,19 @@ export function fileIconForEntry(
   if (mime.startsWith('audio/') || AUDIO_EXTS.has(ext)) return AudioIcon;
   return DocumentIcon;
 }
+
+type FileEntryIconProps = IconProps & {
+  isDirectory: boolean;
+  name: string;
+  contentType: string | null;
+};
+
+export function FileEntryIcon({ isDirectory, name, contentType, size = 20, className }: FileEntryIconProps) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  const mime = contentType?.split(';')[0].trim() ?? '';
+  if (isDirectory) return <FolderIcon size={size} className={className} />;
+  if (mime.startsWith('image/') || IMAGE_EXTS.has(ext)) return <ImageIcon size={size} className={className} />;
+  if (mime.startsWith('video/') || VIDEO_EXTS.has(ext)) return <VideoIcon size={size} className={className} />;
+  if (mime.startsWith('audio/') || AUDIO_EXTS.has(ext)) return <AudioIcon size={size} className={className} />;
+  return <DocumentIcon size={size} className={className} />;
+}

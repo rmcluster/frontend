@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent } from 'react';
 import { uploadFile } from '../../lib/webdav';
+import { Loader, Upload } from 'lucide-react';
 
 type UploadButtonProps = {
   currentPath: string;
@@ -74,48 +75,12 @@ export function UploadButton({ currentPath, onUploaded }: UploadButtonProps) {
         >
           {uploading ? (
             <>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                className="animate-spin"
-                fill="none"
-                aria-hidden="true"
-              >
-                <circle
-                  cx="7"
-                  cy="7"
-                  r="5.5"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  strokeDasharray="20 14"
-                />
-              </svg>
+              <Loader size={14} className="animate-spin" />
               {progress !== null ? `${Math.round(progress)}%` : 'Uploading…'}
             </>
           ) : (
             <>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M7 2v8M4 5l3-3 3 3"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M2 11h10"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Upload size={14} />
               Upload
             </>
           )}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from '../../types/ui';
+import { ClusterIcon } from '../../icons/ClusterIcon';
 
 type ChatMessagesProps = {
   messages: ChatMessage[];
@@ -32,7 +33,6 @@ function parseThinking(content: string): {
   }
   const closeIdx = content.indexOf('</think>');
   if (closeIdx === -1) {
-    // Still inside the think block
     return {
       thinking: content.slice('<think>'.length).trimStart(),
       response: '',
@@ -55,7 +55,6 @@ function ThinkingBlock({
   thinking: string;
   thinkingComplete: boolean;
 }) {
-  // Start open; auto-collapse when the </think> tag arrives.
   const [open, setOpen] = useState(true);
   const prevComplete = useRef(false);
   useEffect(() => {
@@ -84,14 +83,9 @@ function ThinkingBlock({
   );
 }
 
-const AssistantIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <circle cx="4" cy="4" r="2.2" fill="currentColor" />
-    <circle cx="10" cy="4" r="2.2" fill="currentColor" opacity="0.5" />
-    <circle cx="4" cy="10" r="2.2" fill="currentColor" opacity="0.5" />
-    <circle cx="10" cy="10" r="2.2" fill="currentColor" opacity="0.3" />
-  </svg>
-);
+// Shared class strings to avoid repetition
+const assistantAvatar = 'w-7.5 h-7.5 rounded-sm shrink-0 grid place-items-center text-[0.7rem] font-(--font-heading) bg-(--bg-elevated) border border-(--border) text-(--accent) mt-0.5';
+const assistantBubble = 'msg-bubble--markdown px-4 py-2.5 rounded-2xl rounded-bl-sm text-[0.9375rem] leading-relaxed max-w-150 word-break bg-(--bg-surface) border border-(--border) text-(--text-primary)';
 
 export function ChatMessages({ messages, streaming, streamingContent, loadingPhase, loadingProgress = 0 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -114,11 +108,11 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
         if (msg.role === 'assistant') {
           const { thinking, response, thinkingComplete } = parseThinking(msg.content);
           return (
-            <div key={idx} className="flex gap-3 max-w-[780px] w-full self-start">
-              <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold font-[var(--font-heading)] bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent)] mt-0.5">
-                <AssistantIcon />
+            <div key={idx} className="flex gap-3 max-w-195 w-full self-start">
+              <div className={assistantAvatar}>
+                <ClusterIcon />
               </div>
-              <div className="msg-bubble--markdown px-4 py-2.5 rounded-2xl rounded-bl-[var(--radius-sm)] text-[0.9375rem] leading-relaxed max-w-[600px] word-break bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-primary)]">
+              <div className={assistantBubble}>
                 {thinking && (
                   <ThinkingBlock thinking={thinking} thinkingComplete={thinkingComplete} />
                 )}
@@ -131,27 +125,26 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
         }
 
         return (
-          <div key={idx} className="flex gap-3 max-w-[780px] w-full self-end flex-row-reverse">
-            <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold font-[var(--font-heading)] bg-[var(--accent)] text-white mt-0.5">
+          <div key={idx} className="flex gap-3 max-w-195 w-full self-end flex-row-reverse">
+            <div className="w-7.5 h-7.5 rounded-sm shrink-0 grid place-items-center text-[0.7rem] font-(--font-heading) bg-(--accent) text-white mt-0.5">
               U
             </div>
-            <div className="px-4 py-2.5 rounded-2xl rounded-br-[var(--radius-sm)] text-[0.9375rem] leading-relaxed max-w-[600px] break-words whitespace-pre-wrap bg-[var(--accent)] text-white">
+            <div className="px-4 py-2.5 rounded-2xl rounded-br-sm text-[0.9375rem] leading-relaxed max-w-150 wrap-break-word whitespace-pre-wrap bg-(--accent) text-white">
               {msg.content}
             </div>
           </div>
         );
       })}
 
-      {/* Live streaming message — rendered directly from streamingContent to avoid
-          per-token localStorage writes that come with updating the messages array */}
+      {/* Live streaming message */}
       {streaming && streamingContent !== '' && (() => {
         const { thinking, response, thinkingComplete } = parseThinking(streamingContent);
         return (
-          <div className="flex gap-3 max-w-[780px] w-full self-start">
-            <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold font-[var(--font-heading)] bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent)] mt-0.5">
-              <AssistantIcon />
+          <div className="flex gap-3 max-w-195 w-full self-start">
+            <div className={assistantAvatar}>
+              <ClusterIcon />
             </div>
-            <div className="msg-bubble--markdown px-4 py-2.5 rounded-2xl rounded-bl-[var(--radius-sm)] text-[0.9375rem] leading-relaxed max-w-[600px] word-break bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-primary)]">
+            <div className={assistantBubble}>
               {thinking && (
                 <ThinkingBlock thinking={thinking} thinkingComplete={thinkingComplete} />
               )}
@@ -165,9 +158,9 @@ export function ChatMessages({ messages, streaming, streamingContent, loadingPha
 
       {/* Status indicator while waiting for first token */}
       {streaming && streamingContent === '' && (
-        <div className="flex gap-3 max-w-[780px] w-full self-start">
-          <div className="w-[30px] h-[30px] rounded-[var(--radius-sm)] flex-shrink-0 grid place-items-center text-[0.7rem] font-bold bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--accent)] mt-0.5">
-            <AssistantIcon />
+        <div className="flex gap-3 max-w-195 w-full self-start">
+          <div className="w-7.5 h-7.5 rounded-sm shrink-0 grid place-items-center text-[0.7rem] bg-(--bg-elevated) border border-(--border) text-(--accent) mt-0.5">
+            <ClusterIcon />
           </div>
           {loadingPhase && phaseLabel(loadingPhase, loadingProgress) ? (
             <div className="typing-status">

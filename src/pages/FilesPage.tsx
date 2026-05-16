@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { listDir, createFolder, createFile, moveEntry } from '../lib/webdav';
-import type { DavEntry } from '../lib/webdav';
+import type { DavEntry, ViewMode } from '../types/files';
 import { PageHeader } from '../components/PageHeader';
 import { FileBreadcrumb } from '../components/files/FileBreadcrumb';
-import { FileList, type ViewMode } from '../components/files/FileList';
+import { FileList } from '../components/files/FileList';
 import { FileViewer } from '../components/files/FileViewer';
 import { NewFolderModal } from '../components/files/NewFolderModal';
 import { NewFileModal } from '../components/files/NewFileModal';
 import { UploadButton } from '../components/files/UploadButton';
+import { FilePlus, Plus, List, LayoutGrid, Info } from 'lucide-react';
 
 export function FilesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,52 +140,14 @@ export function FilesPage() {
                 onClick={() => setFileModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M2 2h7l3 3v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M9 2v3h3"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5 8h4M7 6v4"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <FilePlus size={14} />
                 New File
               </button>
               <button
                 onClick={() => setFolderModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M7 2v10M2 7h10"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <Plus size={14} />
                 New Folder
               </button>
               <UploadButton currentPath={currentPath} onUploaded={load} />
@@ -202,90 +165,20 @@ export function FilesPage() {
           onDropToPath={handleDropToPath}
         />
         {!isViewing && (
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setViewMode('list')}
               aria-label="List view"
               className={`p-1.5 rounded transition-colors cursor-pointer outline-none ${viewMode === 'list' ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                aria-hidden="true"
-              >
-                <rect
-                  x="2"
-                  y="3"
-                  width="12"
-                  height="2"
-                  rx="1"
-                  fill="currentColor"
-                />
-                <rect
-                  x="2"
-                  y="7"
-                  width="12"
-                  height="2"
-                  rx="1"
-                  fill="currentColor"
-                />
-                <rect
-                  x="2"
-                  y="11"
-                  width="12"
-                  height="2"
-                  rx="1"
-                  fill="currentColor"
-                />
-              </svg>
+              <List size={16} />
             </button>
             <button
               onClick={() => setViewMode('grid')}
               aria-label="Grid view"
               className={`p-1.5 rounded transition-colors cursor-pointer outline-none ${viewMode === 'grid' ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                aria-hidden="true"
-              >
-                <rect
-                  x="2"
-                  y="2"
-                  width="5"
-                  height="5"
-                  rx="1"
-                  fill="currentColor"
-                />
-                <rect
-                  x="9"
-                  y="2"
-                  width="5"
-                  height="5"
-                  rx="1"
-                  fill="currentColor"
-                />
-                <rect
-                  x="2"
-                  y="9"
-                  width="5"
-                  height="5"
-                  rx="1"
-                  fill="currentColor"
-                />
-                <rect
-                  x="9"
-                  y="9"
-                  width="5"
-                  height="5"
-                  rx="1"
-                  fill="currentColor"
-                />
-              </svg>
+              <LayoutGrid size={16} />
             </button>
           </div>
         )}
@@ -312,27 +205,7 @@ export function FilesPage() {
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--text-muted)]">
-            <svg
-              width="40"
-              height="40"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
-              <path
-                d="M12 8v4M12 16h.01"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <Info size={40} />
             <p className="text-sm">{error}</p>
             <button
               onClick={load}

@@ -1,131 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import type { DavEntry } from '../../lib/webdav';
+import type { DavEntry } from '../../types/files';
+import { extOf, classify } from '../../types/files';
 import { downloadUrl, moveEntry } from '../../lib/webdav';
 import { DAV_BASE } from '../../lib/routes';
 import { ConfirmModal } from './ConfirmModal';
-
-const IMAGE_EXTS = new Set([
-  'jpg',
-  'jpeg',
-  'png',
-  'gif',
-  'webp',
-  'svg',
-  'avif',
-  'bmp',
-]);
-const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v']);
-const TEXT_EXTS = new Set([
-  'txt',
-  'md',
-  'json',
-  'csv',
-  'js',
-  'ts',
-  'tsx',
-  'jsx',
-  'py',
-  'go',
-  'rs',
-  'yaml',
-  'yml',
-  'toml',
-  'xml',
-  'html',
-  'css',
-  'sh',
-  'bash',
-  'env',
-  'gitignore',
-  'log',
-]);
-
-function extOf(name: string) {
-  const parts = name.split('.');
-  if (parts.length < 2 || parts[0] === '') return '';
-  return parts.pop()?.toLowerCase() ?? '';
-}
-
-type FileType = 'image' | 'video' | 'text' | 'unknown';
-
-function classify(name: string, contentType: string | null): FileType {
-  const ext = extOf(name);
-  const mime = contentType?.split(';')[0].trim() ?? '';
-  if (mime.startsWith('image/') || IMAGE_EXTS.has(ext)) return 'image';
-  if (mime.startsWith('video/') || VIDEO_EXTS.has(ext)) return 'video';
-  if (mime.startsWith('text/') || TEXT_EXTS.has(ext)) return 'text';
-  // Default to text editor for unknown / no-extension files
-  return 'text';
-}
-
-// ── CSV viewer ────────────────────────────────────────────────────────────────
-
-function parseCsv(raw: string): string[][] {
-  return raw
-    .split('\n')
-    .filter((l) => l.trim() !== '')
-    .map((line) => {
-      const cols: string[] = [];
-      let cur = '';
-      let inQ = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQ && line[i + 1] === '"') {
-            cur += '"';
-            i++;
-          } else inQ = !inQ;
-        } else if (ch === ',' && !inQ) {
-          cols.push(cur);
-          cur = '';
-        } else {
-          cur += ch;
-        }
-      }
-      cols.push(cur);
-      return cols;
-    });
-}
-
-function CsvTable({ raw }: { raw: string }) {
-  const rows = parseCsv(raw);
-  if (rows.length === 0)
-    return <p className="text-sm text-[var(--text-muted)]">Empty CSV</p>;
-  const [header, ...body] = rows;
-  return (
-    <div className="overflow-auto rounded-lg border border-[var(--border)]">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wide">
-            {header.map((h, i) => (
-              <th
-                key={i}
-                className="text-left px-3 py-2 font-semibold border-b border-[var(--border)] whitespace-nowrap"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {body.map((row, ri) => (
-            <tr
-              key={ri}
-              className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors"
-            >
-              {row.map((cell, ci) => (
-                <td key={ci} className="px-3 py-1.5 text-[var(--text-primary)]">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+import { CsvViewer } from './CsvViewer';
+import { ChevronLeft, Check, X, Pencil } from 'lucide-react';
 
 // ── JSON viewer ───────────────────────────────────────────────────────────────
 
@@ -319,21 +200,7 @@ export function FileViewer({
             onClick={() => (isDirty ? setShowLeaveWarning(true) : onClose())}
             className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer outline-none shrink-0 mr-1"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M10 3L5 8l5 5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <ChevronLeft size={16} />
             Back
           </button>
 
@@ -364,41 +231,14 @@ export function FileViewer({
                   className="shrink-0 p-1 rounded text-[var(--accent)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer outline-none disabled:opacity-50"
                   aria-label="Save rename"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 14 14"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M2 7l4 4 6-7"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <Check size={14} />
                 </button>
                 <button
                   onClick={cancelRenameTitle}
                   className="shrink-0 p-1 rounded text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-colors cursor-pointer outline-none"
                   aria-label="Cancel rename"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 14 14"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M3 3l8 8M11 3L3 11"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+                  <X size={14} />
                 </button>
               </>
             ) : (
@@ -410,21 +250,9 @@ export function FileViewer({
                 <span className="text-sm text-[var(--text-primary)] font-medium truncate">
                   {entry.name}
                 </span>
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 13 13"
-                  fill="none"
+                <Pencil size={13}
                   className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-[var(--text-secondary)]"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M9 1.5l2.5 2.5-7 7H2V8.5l7-7z"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                />
               </button>
             )}
           </div>
@@ -533,7 +361,7 @@ export function FileViewer({
               Failed to load: {fetchError}
             </div>
           ) : preview && ext === 'csv' ? (
-            <CsvTable raw={textContent} />
+            <CsvViewer raw={textContent} />
           ) : preview && ext === 'json' ? (
             <JsonPreview raw={textContent} />
           ) : preview && ext === 'md' ? (

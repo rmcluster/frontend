@@ -1,13 +1,6 @@
 import { DAV_BASE } from './routes';
-
-export interface DavEntry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  size: number | null;
-  lastModified: string | null;
-  contentType: string | null;
-}
+import type { DavEntry } from '../types/files';
+export type { DavEntry } from '../types/files';
 
 function parsePropfind(xml: string, requestedPath: string): DavEntry[] {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');

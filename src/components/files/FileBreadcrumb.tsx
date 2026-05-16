@@ -1,6 +1,7 @@
 type DroppedEntry = { path: string; name: string; isDirectory: boolean };
 
 import { useState } from 'react';
+import { ChevronRight, Pencil } from 'lucide-react';
 
 type FileBreadcrumbProps = {
   path: string;
@@ -9,25 +10,6 @@ type FileBreadcrumbProps = {
   onRenameFile?: () => void;
   onDropToPath?: (entry: DroppedEntry, targetPath: string) => void;
 };
-
-const chevron = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 14 14"
-    fill="none"
-    className="flex-shrink-0 text-[var(--text-muted)]"
-    aria-hidden="true"
-  >
-    <path
-      d="M5 3l4 4-4 4"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 export function FileBreadcrumb({
   path,
@@ -60,7 +42,9 @@ export function FileBreadcrumb({
         const clickable = !isLast || lastFolderIsClickable;
         return (
           <span key={crumb.path} className="flex items-center gap-1 min-w-0">
-            {i > 0 && chevron}
+            {i > 0 && (
+              <ChevronRight size={14} className="shrink-0 text-(--text-muted)" />
+            )}
             {clickable ? (
               <button
                 onClick={() => onNavigate(crumb.path)}
@@ -95,7 +79,7 @@ export function FileBreadcrumb({
 
       {fileSegment && (
         <span className="flex items-center gap-1 min-w-0">
-          {chevron}
+          <ChevronIcon className="shrink-0 text-(--text-muted)" />
           <span className="text-[var(--text-primary)] font-medium truncate max-w-[240px]">
             {fileSegment}
           </span>
@@ -105,20 +89,7 @@ export function FileBreadcrumb({
               title="Rename file"
               className="shrink-0 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer outline-none"
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 13 13"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M9 1.5l2.5 2.5-7 7H2V8.5l7-7z"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Pencil size={13} />
             </button>
           )}
         </span>

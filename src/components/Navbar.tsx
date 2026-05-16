@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
+import { LogoIcon } from '../icons/LogoIcon';
 
 export function Navbar() {
   const { pathname } = useLocation();
@@ -17,16 +18,8 @@ export function Navbar() {
         to="/"
         className="flex items-center gap-2 font-[var(--font-heading)] font-bold text-[var(--text-primary)] text-base"
       >
-        <span
-          className="w-[26px] h-[26px] rounded-[var(--radius-sm)] bg-[var(--accent)] grid place-items-center flex-shrink-0"
-          aria-hidden="true"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <circle cx="4" cy="4" r="2.5" fill="white" />
-            <circle cx="10" cy="4" r="2.5" fill="rgba(255,255,255,0.55)" />
-            <circle cx="4" cy="10" r="2.5" fill="rgba(255,255,255,0.55)" />
-            <circle cx="10" cy="10" r="2.5" fill="rgba(255,255,255,0.35)" />
-          </svg>
+        <span className="w-6.5 h-6.5 rounded-sm bg-(--accent) grid place-items-center shrink-0">
+          <LogoIcon size={14} />
         </span>
         rmcluster
       </Link>

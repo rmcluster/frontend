@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { DavEntry } from '../../lib/webdav';
+import type { DavEntry } from '../../types/files';
 import { listDir } from '../../lib/webdav';
-import { FolderIcon } from './FileIcon';
+import { Folder, ChevronRight, FolderOpen } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,12 +16,6 @@ type MoveToModalProps = {
   onClose: () => void;
   onMove: (targetFolderPath: string) => Promise<void>;
 };
-
-const chevron = (
-  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true" className="shrink-0 text-(--text-muted)">
-    <path d="M3.5 2l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 
 export function MoveToModal({ open, entry, onClose, onMove }: MoveToModalProps) {
   const [browsePath, setBrowsePath] = useState('/');
@@ -103,7 +97,7 @@ export function MoveToModal({ open, entry, onClose, onMove }: MoveToModalProps) 
         <nav className="flex items-center gap-1 flex-wrap text-xs text-(--text-secondary) mb-2 overflow-x-auto whitespace-nowrap" aria-label="Browse path">
           {crumbs.map((crumb, i) => (
             <span key={crumb.path} className="flex items-center gap-1 min-w-0">
-              {i > 0 && chevron}
+              {i > 0 && <ChevronRight size={10} className="shrink-0 text-(--text-muted)" />}
               <button
                 onClick={() => setBrowsePath(crumb.path)}
                 className={`truncate cursor-pointer outline-none hover:underline transition-colors ${crumb.path === browsePath ? 'text-(--text-primary) font-semibold' : 'hover:text-(--text-primary)'}`}
@@ -128,9 +122,7 @@ export function MoveToModal({ open, entry, onClose, onMove }: MoveToModalProps) 
             </div>
           ) : folders.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-1 text-xs text-(--text-muted)">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
+              <FolderOpen size={24} />
               No subfolders here
             </div>
           ) : (
@@ -144,11 +136,9 @@ export function MoveToModal({ open, entry, onClose, onMove }: MoveToModalProps) 
                     disabled={disabled}
                     className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm text-(--text-primary) hover:bg-(--bg-surface) transition-colors cursor-pointer outline-none disabled:opacity-40 disabled:cursor-not-allowed text-left"
                   >
-                    <FolderIcon size={16} className="shrink-0 text-(--text-muted)" />
+                    <Folder size={16} className="shrink-0 text-(--accent)" />
                     <span className="truncate">{folder.name}</span>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="ml-auto shrink-0 text-(--text-muted)" aria-hidden="true">
-                      <path d="M4.5 2.5l3 3.5-3 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <ChevronRight size={12} className="ml-auto shrink-0 text-(--text-muted)" />
                   </button>
                 );
               })}

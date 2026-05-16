@@ -12,14 +12,40 @@ export type FileKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'unknown';
 export type ViewMode = 'list' | 'grid';
 
 export const IMAGE_EXTS = new Set([
-  'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif', 'bmp',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'svg',
+  'avif',
+  'bmp',
 ]);
 export const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v']);
 export const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a']);
 export const TEXT_EXTS = new Set([
-  'txt', 'md', 'json', 'csv', 'js', 'ts', 'tsx', 'jsx',
-  'py', 'go', 'rs', 'yaml', 'yml', 'toml', 'xml', 'html',
-  'css', 'sh', 'bash', 'env', 'gitignore', 'log',
+  'txt',
+  'md',
+  'json',
+  'csv',
+  'js',
+  'ts',
+  'tsx',
+  'jsx',
+  'py',
+  'go',
+  'rs',
+  'yaml',
+  'yml',
+  'toml',
+  'xml',
+  'html',
+  'css',
+  'sh',
+  'bash',
+  'env',
+  'gitignore',
+  'log',
 ]);
 
 export function extOf(name: string): string {
@@ -36,5 +62,8 @@ export function classify(name: string, contentType: string | null): FileKind {
   if (mime.startsWith('audio/') || AUDIO_EXTS.has(ext)) return 'audio';
   if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
   if (mime.startsWith('text/') || TEXT_EXTS.has(ext)) return 'text';
+  // Known extension we can't render → show download prompt, not garbled binary
+  if (ext) return 'unknown';
+  // No extension → best-effort plain text
   return 'text';
 }

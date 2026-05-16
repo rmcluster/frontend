@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { FileX } from 'lucide-react';
 import type { DavEntry } from '../../types/files';
 import { extOf, classify } from '../../types/files';
 import { DAV_BASE } from '../../lib/routes';
@@ -123,6 +124,20 @@ export const FileViewer = forwardRef<FileViewerHandle, FileViewerProps>(
             },
           ]}
         />
+
+        {kind === 'unknown' && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-(--text-muted)">
+            <FileX size={40} className="opacity-40" />
+            <p className="text-sm">No preview available for this file type.</p>
+            <a
+              href={src}
+              download={entry.name}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity"
+            >
+              Download {entry.name}
+            </a>
+          </div>
+        )}
 
         {kind === 'audio' && (
           <div className="flex items-center justify-center p-12">

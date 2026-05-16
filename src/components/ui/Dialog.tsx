@@ -43,10 +43,7 @@ export function DialogHeader({ children }: { children: ReactNode }) {
 
 export function DialogTitle({ children }: { children: ReactNode }) {
   return (
-    <D.Title
-      style={{ fontFamily: 'var(--font-heading)' }}
-      className="text-lg font-bold text-(--text-primary)"
-    >
+    <D.Title className="text-base font-semibold text-(--text-primary)">
       {children}
     </D.Title>
   );

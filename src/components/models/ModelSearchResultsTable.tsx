@@ -9,10 +9,10 @@ export function ModelSearchResultsTable({ results, onAdd }: ModelSearchResultsTa
   if (results.length === 0) return null;
 
   return (
-    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-4">
-      <h2 className="font-[var(--font-heading)] text-base font-semibold text-[var(--text-primary)] mb-4 tracking-[-0.01em]">
+    <div className="mb-4">
+      <div className="px-4 pt-6 pb-2 border-t border-(--border) text-[0.7rem] font-semibold tracking-widest uppercase text-(--text-muted)">
         Search results
-      </h2>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>

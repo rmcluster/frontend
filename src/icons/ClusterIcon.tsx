@@ -1,4 +1,4 @@
-import type { IconProps } from './iconProps';
+type IconProps = { size?: number; className?: string };
 export function ClusterIcon({ size = 14, className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" fill="none" className={className} aria-hidden="true">

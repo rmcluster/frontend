@@ -1,21 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { listDir, createFolder, createFile, moveEntry } from '../lib/webdav';
+import { listDir, createFolder, createFile, moveEntry, downloadUrl } from '../lib/webdav';
 import type { DavEntry, ViewMode } from '../types/files';
+import { extOf, classify } from '../types/files';
 import { PageHeader } from '../components/PageHeader';
 import { FileBreadcrumb } from '../components/files/FileBreadcrumb';
 import { FileList } from '../components/files/FileList';
 import { FileViewer } from '../components/files/FileViewer';
+import type { FileViewerHandle } from '../components/files/FileViewer';
 import { NewFolderModal } from '../components/files/NewFolderModal';
 import { NewFileModal } from '../components/files/NewFileModal';
 import { UploadButton } from '../components/files/UploadButton';
-import { FilePlus, Plus, List, LayoutGrid, Info } from 'lucide-react';
+import { StateDisplay, SkeletonRows } from '../components/StateDisplay';
+import { ChevronLeft, FilePlus, Plus, List, LayoutGrid } from 'lucide-react';
 
 export function FilesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  // currentPath is derived from ?path= so reload and browser back/forward work
   const currentPath = searchParams.get('path') ?? '/';
-
   const filePath = searchParams.get('file');
   const fileMode = searchParams.get('mode') as 'preview' | 'edit' | null;
 
@@ -27,6 +28,8 @@ export function FilesPage() {
   const [fileModalOpen, setFileModalOpen] = useState(false);
   const [viewingEntry, setViewingEntry] = useState<DavEntry | null>(null);
   const [renameSignal, setRenameSignal] = useState(0);
+
+  const viewerRef = useRef<FileViewerHandle>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,15 +49,21 @@ export function FilesPage() {
     load();
   }, [load]);
 
-  // Restore viewed file from URL after directory entries load
+  // Restore viewed file from URL once entries are available.
   useEffect(() => {
-    if (!filePath || viewingEntry) return;
+    if (!filePath || viewingEntry || loading) return;
     const found = entries.find((e) => e.path === filePath);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (found) setViewingEntry(found);
-    // viewingEntry intentionally omitted — only run when entries/filePath change
+    // viewingEntry intentionally omitted — only run when entries/filePath/loading change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, filePath]);
+  }, [entries, filePath, loading]);
+
+  // Derive viewer state from the current viewing entry
+  const viewingExt = viewingEntry ? extOf(viewingEntry.name) : null;
+  const viewingIsStructured = viewingExt === 'csv' || viewingExt === 'json' || viewingExt === 'md';
+  const viewingKind = viewingEntry ? classify(viewingEntry.name, viewingEntry.contentType) : null;
+  const viewingPreview = fileMode != null ? fileMode === 'preview' : viewingIsStructured;
 
   function buildParams(overrides: Record<string, string | null>) {
     const params: Record<string, string> = {};
@@ -78,12 +87,12 @@ export function FilesPage() {
 
   function openFile(entry: DavEntry) {
     setViewingEntry(entry);
-    setSearchParams(buildParams({ file: entry.path }), { replace: false });
+    setSearchParams(buildParams({ file: entry.path, mode: null }), { replace: false });
   }
 
   function closeViewer() {
     setViewingEntry(null);
-    setSearchParams(buildParams({ file: null }), { replace: false });
+    setSearchParams(buildParams({ file: null, mode: null }), { replace: false });
   }
 
   function handleFileModeChange(mode: 'preview' | 'edit') {
@@ -92,7 +101,6 @@ export function FilesPage() {
 
   function handleViewerRename(updated: DavEntry) {
     setViewingEntry(updated);
-    // replace so back-button doesn't restore the old filename in the URL
     setSearchParams(buildParams({ file: updated.path }), { replace: true });
   }
 
@@ -128,31 +136,78 @@ export function FilesPage() {
   }
 
   const isViewing = viewingEntry !== null;
+  const awaitingEntry = !!filePath && !isViewing && loading;
+  const fileNotFound = !!filePath && !isViewing && !loading;
 
   return (
-    <div className="px-6 py-8 max-w-5xl mx-auto">
+    <>
       <PageHeader
+        eyebrow="Storage"
         title="Files"
         actions={
-          !isViewing ? (
+          isViewing && viewingEntry ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => viewerRef.current?.tryClose()}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors cursor-pointer outline-none"
+              >
+                <ChevronLeft size={14} />
+                Back
+              </button>
+
+              {viewingKind === 'text' && viewingIsStructured && (
+                <div className="flex items-center border border-(--border) rounded-md overflow-hidden shrink-0">
+                  <button
+                    onClick={() => handleFileModeChange('preview')}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer outline-none ${viewingPreview ? 'bg-(--accent) text-white' : 'bg-(--bg-surface) text-(--text-muted) hover:text-(--text-primary)'}`}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => handleFileModeChange('edit')}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer outline-none ${!viewingPreview ? 'bg-(--accent) text-white' : 'bg-(--bg-surface) text-(--text-muted) hover:text-(--text-primary)'}`}
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
+
+              {viewingKind === 'text' && (
+                <button
+                  onClick={() => viewerRef.current?.save()}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none ${viewingPreview ? 'invisible pointer-events-none' : ''}`}
+                >
+                  Save
+                </button>
+              )}
+
+              <a
+                href={downloadUrl(viewingEntry.path)}
+                download={viewingEntry.name}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors outline-none"
+              >
+                Download
+              </a>
+            </div>
+          ) : (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setFileModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors cursor-pointer outline-none"
               >
                 <FilePlus size={14} />
                 New File
               </button>
               <button
                 onClick={() => setFolderModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors cursor-pointer outline-none"
               >
                 <Plus size={14} />
                 New Folder
               </button>
               <UploadButton currentPath={currentPath} onUploaded={load} />
             </div>
-          ) : undefined
+          )
         }
       />
 
@@ -169,14 +224,14 @@ export function FilesPage() {
             <button
               onClick={() => setViewMode('list')}
               aria-label="List view"
-              className={`p-1.5 rounded transition-colors cursor-pointer outline-none ${viewMode === 'list' ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              className={`p-1.5 rounded transition-colors cursor-pointer outline-none ${viewMode === 'list' ? 'bg-(--bg-elevated) text-(--text-primary)' : 'text-(--text-muted) hover:text-(--text-primary)'}`}
             >
               <List size={16} />
             </button>
             <button
               onClick={() => setViewMode('grid')}
               aria-label="Grid view"
-              className={`p-1.5 rounded transition-colors cursor-pointer outline-none ${viewMode === 'grid' ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              className={`p-1.5 rounded transition-colors cursor-pointer outline-none ${viewMode === 'grid' ? 'bg-(--bg-elevated) text-(--text-primary)' : 'text-(--text-muted) hover:text-(--text-primary)'}`}
             >
               <LayoutGrid size={16} />
             </button>
@@ -184,37 +239,23 @@ export function FilesPage() {
         )}
       </div>
 
-      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-xl)] overflow-hidden">
-        {isViewing ? (
+      {isViewing && viewingEntry ? (
+        <div className="bg-(--bg-surface) border border-(--border) rounded-xl overflow-hidden">
           <FileViewer
+            ref={viewerRef}
             entry={viewingEntry}
             onClose={closeViewer}
             onRename={handleViewerRename}
-            fileMode={fileMode}
-            onFileModeChange={handleFileModeChange}
+            preview={viewingPreview}
             renameSignal={renameSignal}
           />
-        ) : loading ? (
-          <div className="flex flex-col gap-2 p-4">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="h-9 rounded-md bg-[var(--bg-elevated)] animate-pulse"
-              />
-            ))}
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--text-muted)]">
-            <Info size={40} />
-            <p className="text-sm">{error}</p>
-            <button
-              onClick={load}
-              className="text-sm text-[var(--accent)] hover:underline cursor-pointer outline-none"
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
+        </div>
+      ) : awaitingEntry ? (
+        <SkeletonRows count={3} />
+      ) : fileNotFound ? (
+        <StateDisplay error={`File not found: ${filePath}`} onRetry={load} />
+      ) : (
+        <StateDisplay loading={loading} error={error} onRetry={load}>
           <FileList
             entries={entries}
             viewMode={viewMode}
@@ -222,8 +263,8 @@ export function FilesPage() {
             onOpenFile={openFile}
             onRefresh={load}
           />
-        )}
-      </div>
+        </StateDisplay>
+      )}
 
       <NewFolderModal
         open={folderModalOpen}
@@ -235,6 +276,6 @@ export function FilesPage() {
         onClose={() => setFileModalOpen(false)}
         onCreate={handleCreateFile}
       />
-    </div>
+    </>
   );
 }

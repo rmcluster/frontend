@@ -79,8 +79,8 @@ export function FileBreadcrumb({
 
       {fileSegment && (
         <span className="flex items-center gap-1 min-w-0">
-          <ChevronIcon className="shrink-0 text-(--text-muted)" />
-          <span className="text-[var(--text-primary)] font-medium truncate max-w-[240px]">
+          <ChevronRight size={14} className="shrink-0 text-(--text-muted)" />
+          <span className="text-[var(--text-primary)] font-medium truncate">
             {fileSegment}
           </span>
           {onRenameFile && (

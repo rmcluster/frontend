@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,7 @@ type LocalModelModalProps = {
   uploading: boolean;
   canUseLocalFile: boolean;
   onClose: () => void;
-  onSave: (event: { preventDefault(): void }) => void;
+  onSave: (event: React.FormEvent) => void;
   onNameChange: (value: string) => void;
   onParametersChange: (value: string) => void;
   onQuantizationChange: (value: string) => void;

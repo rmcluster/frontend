@@ -4,12 +4,11 @@ import { Loader, AlertCircle } from 'lucide-react';
 type Props = {
   loading?: boolean;
   error?: string | null;
-  loadingRows?: number;
   children?: ReactNode;
   onRetry?: () => void;
 };
 
-export function StateDisplay({ loading, error, loadingRows = 5, children, onRetry }: Props) {
+export function StateDisplay({ loading, error, children, onRetry }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-(--text-muted)">

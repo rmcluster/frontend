@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { listDir, createFolder, createFile, moveEntry, downloadUrl } from '../lib/webdav';
+import {
+  listDir,
+  createFolder,
+  createFile,
+  moveEntry,
+  downloadUrl,
+} from '../lib/webdav';
 import type { DavEntry, ViewMode } from '../types/files';
 import { extOf, classify } from '../types/files';
 import { PageHeader } from '../components/PageHeader';
@@ -8,6 +14,7 @@ import { FileBreadcrumb } from '../components/files/FileBreadcrumb';
 import { FileList } from '../components/files/FileList';
 import { FileViewer } from '../components/files/FileViewer';
 import type { FileViewerHandle } from '../components/files/FileViewer';
+import { ConfirmModal } from '../components/files/ConfirmModal';
 import { NewFolderModal } from '../components/files/NewFolderModal';
 import { NewFileModal } from '../components/files/NewFileModal';
 import { UploadButton } from '../components/files/UploadButton';
@@ -27,9 +34,28 @@ export function FilesPage() {
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [fileModalOpen, setFileModalOpen] = useState(false);
   const [viewingEntry, setViewingEntry] = useState<DavEntry | null>(null);
-  const [renameSignal, setRenameSignal] = useState(0);
+
+  // Inline rename state (lives here so FileBreadcrumb can render it)
+  const [renamingFile, setRenamingFile] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSubmitting, setRenameSubmitting] = useState(false);
+  const [extWarnNewName, setExtWarnNewName] = useState<string | null>(null);
 
   const viewerRef = useRef<FileViewerHandle>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function handleSave() {
+    if (!viewerRef.current) return;
+    setSaving(true);
+    try {
+      await viewerRef.current.save();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,7 +75,19 @@ export function FilesPage() {
     load();
   }, [load]);
 
-  // Restore viewed file from URL once entries are available.
+  // Clear viewer + rename state when file param changes or is removed
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!filePath) setViewingEntry(null);
+     
+    setRenamingFile(false);
+     
+    setRenameValue('');
+     
+    setExtWarnNewName(null);
+  }, [filePath]);
+
+  // Restore viewed file from URL once entries are available
   useEffect(() => {
     if (!filePath || viewingEntry || loading) return;
     const found = entries.find((e) => e.path === filePath);
@@ -61,9 +99,13 @@ export function FilesPage() {
 
   // Derive viewer state from the current viewing entry
   const viewingExt = viewingEntry ? extOf(viewingEntry.name) : null;
-  const viewingIsStructured = viewingExt === 'csv' || viewingExt === 'json' || viewingExt === 'md';
-  const viewingKind = viewingEntry ? classify(viewingEntry.name, viewingEntry.contentType) : null;
-  const viewingPreview = fileMode != null ? fileMode === 'preview' : viewingIsStructured;
+  const viewingIsStructured =
+    viewingExt === 'csv' || viewingExt === 'json' || viewingExt === 'md';
+  const viewingKind = viewingEntry
+    ? classify(viewingEntry.name, viewingEntry.contentType)
+    : null;
+  const viewingPreview =
+    fileMode != null ? fileMode === 'preview' : viewingIsStructured;
 
   function buildParams(overrides: Record<string, string | null>) {
     const params: Record<string, string> = {};
@@ -87,21 +129,20 @@ export function FilesPage() {
 
   function openFile(entry: DavEntry) {
     setViewingEntry(entry);
-    setSearchParams(buildParams({ file: entry.path, mode: null }), { replace: false });
+    setSearchParams(buildParams({ file: entry.path, mode: null }), {
+      replace: false,
+    });
   }
 
   function closeViewer() {
     setViewingEntry(null);
-    setSearchParams(buildParams({ file: null, mode: null }), { replace: false });
+    setSearchParams(buildParams({ file: null, mode: null }), {
+      replace: false,
+    });
   }
 
   function handleFileModeChange(mode: 'preview' | 'edit') {
     setSearchParams(buildParams({ mode }), { replace: true });
-  }
-
-  function handleViewerRename(updated: DavEntry) {
-    setViewingEntry(updated);
-    setSearchParams(buildParams({ file: updated.path }), { replace: true });
   }
 
   async function handleDropToPath(
@@ -113,6 +154,54 @@ export function FilesPage() {
     await moveEntry(entry.path, toPath);
     await load();
   }
+
+  // ── Rename ────────────────────────────────────────────────────────────────
+
+  function startRename() {
+    if (!viewingEntry) return;
+    setRenameValue(viewingEntry.name);
+    setRenamingFile(true);
+    setExtWarnNewName(null);
+  }
+
+  function cancelRename() {
+    setRenamingFile(false);
+    setExtWarnNewName(null);
+  }
+
+  async function doRename(name: string) {
+    if (!viewingEntry) return;
+    setRenameSubmitting(true);
+    const parentPath = viewingEntry.path.replace(/\/?[^/]+\/?$/, '/');
+    const toPath = `${parentPath}${name}`;
+    await moveEntry(viewingEntry.path, toPath);
+    const updated = { ...viewingEntry, name, path: toPath };
+    setViewingEntry(updated);
+    setSearchParams(buildParams({ file: toPath }), { replace: true });
+    setRenamingFile(false);
+    setRenameSubmitting(false);
+    setExtWarnNewName(null);
+  }
+
+  async function commitRename() {
+    if (!viewingEntry || renameSubmitting) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === viewingEntry.name) {
+      cancelRename();
+      return;
+    }
+
+    const oldExt = extOf(viewingEntry.name);
+    const newExt = extOf(trimmed);
+    if (oldExt && newExt && oldExt !== newExt) {
+      setExtWarnNewName(trimmed);
+      return;
+    }
+
+    await doRename(trimmed);
+  }
+
+  // ── Create ────────────────────────────────────────────────────────────────
 
   async function handleCreateFolder(name: string) {
     const path = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${name}/`;
@@ -156,16 +245,16 @@ export function FilesPage() {
               </button>
 
               {viewingKind === 'text' && viewingIsStructured && (
-                <div className="flex items-center border border-(--border) rounded-md overflow-hidden shrink-0">
+                <div className="flex items-center gap-0.5 bg-(--bg-elevated) rounded-md shrink-0">
                   <button
                     onClick={() => handleFileModeChange('preview')}
-                    className={`px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer outline-none ${viewingPreview ? 'bg-(--accent) text-white' : 'bg-(--bg-surface) text-(--text-muted) hover:text-(--text-primary)'}`}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer outline-none ${viewingPreview ? 'bg-(--accent) text-white' : 'text-(--text-muted) hover:text-(--text-primary)'}`}
                   >
                     Preview
                   </button>
                   <button
                     onClick={() => handleFileModeChange('edit')}
-                    className={`px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer outline-none ${!viewingPreview ? 'bg-(--accent) text-white' : 'bg-(--bg-surface) text-(--text-muted) hover:text-(--text-primary)'}`}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer outline-none ${!viewingPreview ? 'bg-(--accent) text-white' : 'text-(--text-muted) hover:text-(--text-primary)'}`}
                   >
                     Edit
                   </button>
@@ -174,10 +263,11 @@ export function FilesPage() {
 
               {viewingKind === 'text' && (
                 <button
-                  onClick={() => viewerRef.current?.save()}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none ${viewingPreview ? 'invisible pointer-events-none' : ''}`}
+                  onClick={handleSave}
+                  disabled={saving}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-70 disabled:cursor-not-allowed ${viewingPreview ? 'invisible pointer-events-none' : ''}`}
                 >
-                  Save
+                  {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
                 </button>
               )}
 
@@ -216,7 +306,13 @@ export function FilesPage() {
           path={currentPath}
           onNavigate={navigate}
           fileSegment={viewingEntry?.name}
-          onRenameFile={viewingEntry ? () => setRenameSignal((s) => s + 1) : undefined}
+          renamingFile={renamingFile}
+          renameValue={renameValue}
+          renameSubmitting={renameSubmitting}
+          onRenameValueChange={setRenameValue}
+          onRenameCommit={commitRename}
+          onRenameCancel={cancelRename}
+          onRenameStart={startRename}
           onDropToPath={handleDropToPath}
         />
         {!isViewing && (
@@ -245,9 +341,7 @@ export function FilesPage() {
             ref={viewerRef}
             entry={viewingEntry}
             onClose={closeViewer}
-            onRename={handleViewerRename}
             preview={viewingPreview}
-            renameSignal={renameSignal}
           />
         </div>
       ) : awaitingEntry ? (
@@ -265,6 +359,26 @@ export function FilesPage() {
           />
         </StateDisplay>
       )}
+
+      <ConfirmModal
+        open={extWarnNewName !== null}
+        title="Change file type"
+        message={
+          extWarnNewName && viewingEntry
+            ? `Change extension from .${extOf(viewingEntry.name)} to .${extOf(extWarnNewName)}?`
+            : ''
+        }
+        onClose={() => setExtWarnNewName(null)}
+        actions={[
+          {
+            label: 'Change extension',
+            variant: 'primary',
+            onClick: () => {
+              if (extWarnNewName) doRename(extWarnNewName);
+            },
+          },
+        ]}
+      />
 
       <NewFolderModal
         open={folderModalOpen}

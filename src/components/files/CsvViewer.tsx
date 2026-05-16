@@ -31,7 +31,7 @@ export function CsvViewer({ raw }: { raw: string }) {
     return <p className="text-sm text-[var(--text-muted)]">Empty CSV</p>;
   const [header, ...body] = rows;
   return (
-    <div className="overflow-auto rounded-lg border border-[var(--border)]">
+    <div className="overflow-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wide">

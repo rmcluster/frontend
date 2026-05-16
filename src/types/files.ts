@@ -7,7 +7,7 @@ export interface DavEntry {
   contentType: string | null;
 }
 
-export type FileKind = 'image' | 'video' | 'text' | 'unknown';
+export type FileKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'unknown';
 
 export type ViewMode = 'list' | 'grid';
 
@@ -33,6 +33,8 @@ export function classify(name: string, contentType: string | null): FileKind {
   const mime = contentType?.split(';')[0].trim() ?? '';
   if (mime.startsWith('image/') || IMAGE_EXTS.has(ext)) return 'image';
   if (mime.startsWith('video/') || VIDEO_EXTS.has(ext)) return 'video';
+  if (mime.startsWith('audio/') || AUDIO_EXTS.has(ext)) return 'audio';
+  if (mime === 'application/pdf' || ext === 'pdf') return 'pdf';
   if (mime.startsWith('text/') || TEXT_EXTS.has(ext)) return 'text';
   return 'text';
 }

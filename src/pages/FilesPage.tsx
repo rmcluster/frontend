@@ -100,7 +100,8 @@ export function FilesPage() {
   // Derive viewer state from the current viewing entry
   const viewingExt = viewingEntry ? extOf(viewingEntry.name) : null;
   const viewingIsStructured =
-    viewingExt === 'csv' || viewingExt === 'json' || viewingExt === 'md';
+    viewingExt === 'csv' || viewingExt === 'json' || viewingExt === 'md' ||
+    viewingExt === 'html' || viewingExt === 'htm' || viewingExt === 'xml';
   const viewingKind = viewingEntry
     ? classify(viewingEntry.name, viewingEntry.contentType)
     : null;

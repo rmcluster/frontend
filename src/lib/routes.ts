@@ -1,3 +1,5 @@
+export const DAV_BASE = '/dav';
+
 export const apiRoutes = {
   uiModels: '/api/ui/models',
   uiModelsSearch: '/api/ui/models/search',

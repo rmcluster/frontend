@@ -1,5 +1,5 @@
+import * as React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
 import { InstalledModelsTable } from '../components/models/InstalledModelsTable';
 import { LocalModelModal } from '../components/models/LocalModelModal';
 import { ModelSearchResultsTable } from '../components/models/ModelSearchResultsTable';
@@ -36,6 +36,7 @@ export function ModelsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadModels();
   }, []);
 
@@ -44,7 +45,7 @@ export function ModelsPage() {
     [localFile]
   );
 
-  const onSearch = async (event: FormEvent) => {
+  const onSearch = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!query.trim()) {
       setSearchResults([]);
@@ -71,7 +72,7 @@ export function ModelsPage() {
     }
   };
 
-  const saveLocalModel = async (event: FormEvent) => {
+  const saveLocalModel = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!localFile || !canUseLocalFile) {
       setError('Select a .gguf file');
@@ -128,28 +129,26 @@ export function ModelsPage() {
       />
 
       {/* Search */}
-      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 mb-4">
-        <form className="flex gap-3 items-stretch flex-wrap" onSubmit={onSearch}>
-          <input
-            className="flex-1 min-w-[200px] w-full px-3 py-2 text-sm bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent)] transition-colors"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search HuggingFace repos or paste owner/repo…"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={searching}
-          >
-            {searching ? 'Searching…' : 'Search'}
-          </button>
-        </form>
-        {error && (
-          <p className="text-[var(--danger)] text-sm mt-3">
-            {error}
-          </p>
-        )}
-      </div>
+      <form className="flex gap-3 items-stretch flex-wrap mb-6" onSubmit={onSearch}>
+        <input
+          className="flex-1 min-w-50 px-3 py-2 text-sm bg-(--bg-surface) border border-(--border) rounded-md text-(--text-primary) placeholder:text-(--text-muted) outline-none focus:border-(--border-focus) transition-colors"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search HuggingFace repos or paste owner/repo…"
+        />
+        <button
+          type="submit"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={searching}
+        >
+          {searching ? 'Searching…' : 'Search'}
+        </button>
+      </form>
+      {error && (
+        <p className="text-(--danger) text-sm mb-4">
+          {error}
+        </p>
+      )}
 
       <ModelSearchResultsTable results={searchResults} onAdd={addHfModel} />
       <InstalledModelsTable models={models} loading={loading} />

@@ -26,6 +26,10 @@ export function ChatPage() {
   const [streamingContent, setStreamingContent] = useState('');
   const [loadingPhase, setLoadingPhase] = useState('');
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [layersOnGpu, setLayersOnGpu] = useState(0);
+  const [nodeCount, setNodeCount] = useState(0);
+  const firstTokenTimeRef = useRef<number | null>(null);
+  const tokenCountRef = useRef(0);
   const { models } = useModels();
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem('rmcluster_thinking') !== 'false'; }
@@ -41,10 +45,21 @@ export function ChatPage() {
     });
   };
 
-  // Poll loading status only while streaming with no tokens yet.
+  // Always-on slow poll for node count.
+  useEffect(() => {
+    const fetchStatus = () => {
+      void getLoadingStatus().then((s) => setNodeCount(s.node_count)).catch(() => undefined);
+    };
+    fetchStatus();
+    const id = setInterval(fetchStatus, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Fast poll for loading phase only while streaming with no tokens yet.
   // Once the first token arrives (streamingContent !== '') stop immediately.
   useEffect(() => {
     if (!streaming) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingPhase('');
       return;
     }
@@ -55,7 +70,7 @@ export function ChatPage() {
     }
     const id = setInterval(() => {
       void getLoadingStatus()
-        .then((s) => { setLoadingPhase(s.phase); setLoadingProgress(s.progress); })
+        .then((s) => { setLoadingPhase(s.phase); setLoadingProgress(s.progress); setLayersOnGpu(s.layers_on_gpu); setNodeCount(s.node_count); })
         .catch(() => undefined);
     }, 1200);
     return () => clearInterval(id);
@@ -106,6 +121,8 @@ export function ChatPage() {
     abortRef.current = controller;
     setStreaming(true);
     setStreamingContent('');
+    firstTokenTimeRef.current = null;
+    tokenCountRef.current = 0;
 
     const history = [
       // Prepend a system directive when thinking is off so the model skips its <think> block
@@ -122,6 +139,8 @@ export function ChatPage() {
         if (controller.signal.aborted) return false;
       }
       for await (const token of streamChat(history, model, controller.signal)) {
+        if (firstTokenTimeRef.current === null) firstTokenTimeRef.current = Date.now();
+        tokenCountRef.current += 1;
         assistantContent += token;
         setStreamingContent(assistantContent);
       }
@@ -138,7 +157,10 @@ export function ChatPage() {
         if (!succeeded) throw new DOMException('Aborted', 'AbortError');
       }
 
-      updateLastMessage(convId, () => assistantContent);
+      const tps = (firstTokenTimeRef.current !== null && tokenCountRef.current > 0)
+        ? tokenCountRef.current / ((Date.now() - firstTokenTimeRef.current) / 1000)
+        : undefined;
+      updateLastMessage(convId, () => assistantContent, tps);
       void appendChatEvent(convId, {
         event_type: 'message_completed',
         role: 'assistant',
@@ -150,7 +172,10 @@ export function ChatPage() {
         // First attempt threw — retry once before surfacing the error
         try {
           await attemptStream(true);
-          updateLastMessage(convId, () => assistantContent);
+          const tps = (firstTokenTimeRef.current !== null && tokenCountRef.current > 0)
+            ? tokenCountRef.current / ((Date.now() - firstTokenTimeRef.current) / 1000)
+            : undefined;
+          updateLastMessage(convId, () => assistantContent, tps);
           void appendChatEvent(convId, {
             event_type: 'message_completed',
             role: 'assistant',
@@ -220,12 +245,14 @@ export function ChatPage() {
         streamingContent={streamingContent}
         loadingPhase={loadingPhase}
         loadingProgress={loadingProgress}
+        layersOnGpu={layersOnGpu}
       />
       <ChatComposer
         onSend={(content) => void handleSend(content)}
         onStop={handleStop}
         disabled={streaming}
         streaming={streaming}
+        nodeCount={nodeCount}
       />
     </div>
   );

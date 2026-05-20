@@ -13,10 +13,10 @@ export function InstalledModelsTable({
   loading,
 }: InstalledModelsTableProps) {
   return (
-    <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6">
-      <h2 className="font-[var(--font-heading)] text-base font-semibold text-[var(--text-primary)] mb-4 tracking-[-0.01em]">
+    <div>
+      <div className="px-4 pt-6 pb-2 border-t border-(--border) text-[0.7rem] font-semibold tracking-widest uppercase text-(--text-muted)">
         Installed models
-      </h2>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -116,3 +116,4 @@ export function InstalledModelsTable({
     </div>
   );
 }
+

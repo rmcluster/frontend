@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import type { KeyboardEvent } from 'react';
+import { Square, Send } from 'lucide-react';
 
 const MIN_COMPOSER_HEIGHT = 40;
 
@@ -8,9 +9,10 @@ type ChatComposerProps = {
   onStop: () => void;
   disabled: boolean;
   streaming: boolean;
+  nodeCount?: number;
 };
 
-export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatComposerProps) {
+export function ChatComposer({ onSend, onStop, disabled, streaming, nodeCount = 0 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const submit = () => {
@@ -38,11 +40,11 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
   };
 
   return (
-    <div className="px-6 pt-4 pb-4 flex-shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg-base)]">
-      <div className="flex items-end gap-3 bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius-xl)] px-5 py-3 focus-within:border-[var(--border-focus)] focus-within:shadow-[0_0_0_3px_var(--accent-dim)] transition-all max-w-[780px] mx-auto">
+    <div className="px-6 pt-4 pb-4 shrink-0 border-t border-(--border-subtle) bg-(--bg-base)">
+      <div className="flex items-end gap-3 bg-(--bg-surface) border border-(--border) rounded-xl px-5 py-3 focus-within:border-(--border-focus) focus-within:shadow-[0_0_0_3px_var(--accent-dim)] transition-all max-w-195 mx-auto">
         <textarea
           ref={textareaRef}
-          className="chat-composer-textarea flex-1 resize-none border-0 outline-none bg-transparent text-[0.9375rem] text-[var(--text-primary)] leading-5 min-h-10 max-h-[180px] overflow-y-auto py-2.5 px-0 placeholder:text-[var(--text-muted)]"
+          className="chat-composer-textarea flex-1 resize-none border-0 outline-none bg-transparent text-[0.9375rem] text-(--text-primary) leading-5 min-h-10 max-h-45 overflow-y-auto py-2.5 px-0 placeholder:text-(--text-muted)"
           placeholder="Ask anything… (Ctrl+Enter to send)"
           onKeyDown={handleKeyDown}
           onInput={handleInput}
@@ -52,31 +54,26 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
         {streaming ? (
           <button
             type="button"
-            className="flex-shrink-0 w-9 h-9 rounded-[var(--radius-md)] bg-[var(--danger-dim)] text-[var(--danger)] border border-[var(--danger-dim)] grid place-items-center hover:bg-[var(--danger)] hover:text-white transition-colors"
+            className="shrink-0 w-9 h-9 rounded-md bg-(--danger-dim) text-(--danger) border border-(--danger-dim) grid place-items-center hover:bg-(--danger) hover:text-white transition-colors"
             onClick={onStop}
             title="Stop generating"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
+            <Square size={14} fill="currentColor" />
           </button>
         ) : (
           <button
             type="button"
-            className="flex-shrink-0 w-9 h-9 rounded-[var(--radius-md)] bg-[var(--accent)] text-white border-0 grid place-items-center hover:bg-[var(--accent-hover)] hover:scale-105 transition-all disabled:opacity-35 disabled:cursor-not-allowed disabled:scale-100"
+            className="shrink-0 w-9 h-9 rounded-md bg-(--accent) text-white border-0 grid place-items-center hover:bg-(--accent-hover) hover:scale-105 transition-all disabled:opacity-35 disabled:cursor-not-allowed disabled:scale-100"
             onClick={submit}
             disabled={disabled}
             title="Send message (Ctrl+Enter)"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
+            <Send size={14} />
           </button>
         )}
       </div>
-      <p className="text-center text-[0.7rem] text-[var(--text-muted)] mt-2 font-[var(--font-mono)]">
-        Ctrl+Enter to send · rmcluster
+      <p className="text-center text-[0.7rem] text-(--text-muted) mt-2 font-(--font-mono)">
+        Ctrl+Enter to send · {nodeCount === 1 ? '1 node' : `${nodeCount} nodes`}
       </p>
     </div>
   );

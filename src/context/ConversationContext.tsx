@@ -24,7 +24,7 @@ type ConversationContextValue = {
   setActiveId: (id: string | null) => void;
   createConversation: (model: string) => Conversation;
   appendMessage: (id: string, message: ChatMessage) => void;
-  updateLastMessage: (id: string, updater: (prev: string) => string) => void;
+  updateLastMessage: (id: string, updater: (prev: string) => string, tokensPerSec?: number) => void;
   updateConversationModel: (id: string, model: string) => void;
   deleteConversation: (id: string) => void;
   renameConversation: (id: string, title: string) => void;
@@ -75,14 +75,16 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     );
   }, [update]);
 
-  const updateLastMessage = useCallback((id: string, updater: (prev: string) => string) => {
+  const updateLastMessage = useCallback((id: string, updater: (prev: string) => string, tokensPerSec?: number) => {
     update((prev) =>
       prev.map((c) => {
         if (c.id !== id) return c;
         const msgs = [...c.messages];
         if (msgs.length === 0) return c;
         const last = msgs[msgs.length - 1];
-        msgs[msgs.length - 1] = { ...last, content: updater(last.content) };
+        const updated: ChatMessage = { ...last, content: updater(last.content) };
+        if (tokensPerSec !== undefined) updated.tokensPerSec = tokensPerSec;
+        msgs[msgs.length - 1] = updated;
         return { ...c, messages: msgs, updated_at: new Date().toISOString() };
       })
     );

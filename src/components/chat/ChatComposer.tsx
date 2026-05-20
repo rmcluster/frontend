@@ -9,9 +9,10 @@ type ChatComposerProps = {
   onStop: () => void;
   disabled: boolean;
   streaming: boolean;
+  nodeCount?: number;
 };
 
-export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatComposerProps) {
+export function ChatComposer({ onSend, onStop, disabled, streaming, nodeCount = 0 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const submit = () => {
@@ -72,7 +73,7 @@ export function ChatComposer({ onSend, onStop, disabled, streaming }: ChatCompos
         )}
       </div>
       <p className="text-center text-[0.7rem] text-(--text-muted) mt-2 font-(--font-mono)">
-        Ctrl+Enter to send · rmcluster
+        Ctrl+Enter to send · {nodeCount === 1 ? '1 node' : `${nodeCount} nodes`}
       </p>
     </div>
   );

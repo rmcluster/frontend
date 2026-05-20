@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ServersTable } from '../components/dashboard/ServersTable';
 import { AddDeviceModal } from '../components/devices/AddDeviceModal';
 import { PageHeader } from '../components/PageHeader';
@@ -10,6 +10,12 @@ export function DashboardPage() {
   const [servers, setServers] = useState<DashboardServer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const deviceIdsAtOpen = useRef<Set<string> | null>(null);
+
+  const handleOpenAdd = () => {
+    deviceIdsAtOpen.current = new Set(servers.map((s) => s.id));
+    setShowAdd(true);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -18,6 +24,15 @@ export function DashboardPage() {
           apiRoutes.uiDashboard
         );
         setServers(payload.servers);
+        if (deviceIdsAtOpen.current !== null) {
+          const newDevice = payload.servers.some(
+            (s) => !deviceIdsAtOpen.current!.has(s.id)
+          );
+          if (newDevice) {
+            setShowAdd(false);
+            deviceIdsAtOpen.current = null;
+          }
+        }
       } finally {
         setLoading(false);
       }
@@ -39,14 +54,14 @@ export function DashboardPage() {
         actions={
           <button
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none"
-            onClick={() => setShowAdd(true)}
+            onClick={handleOpenAdd}
           >
             Connect a device
           </button>
         }
       />
       <ServersTable servers={servers} loading={loading} />
-      <AddDeviceModal open={showAdd} onClose={() => setShowAdd(false)} />
+      <AddDeviceModal open={showAdd} onClose={() => { setShowAdd(false); deviceIdsAtOpen.current = null; }} />
     </>
   );
 }

@@ -30,6 +30,7 @@ export type DashboardServer = {
 export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
+  tokensPerSec?: number;
 };
 
 export type Device = {

@@ -10,7 +10,8 @@ type ChatMessagesProps = {
   streamingContent: string;
   loadingPhase?: string;
   loadingProgress?: number;
-  layersOnGpu?: number;
+  layersOffloaded?: number;
+  allocatedDevices?: string[];
 };
 
 function phaseLabel(phase: string, progress: number): string {
@@ -115,7 +116,8 @@ export function ChatMessages({
   streamingContent,
   loadingPhase,
   loadingProgress = 0,
-  layersOnGpu = 0,
+  layersOffloaded = 0,
+  allocatedDevices = [],
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -225,7 +227,8 @@ export function ChatMessages({
               <span className="typing-dot" />
               <span className="typing-status-text">
                 {phaseLabel(loadingPhase, loadingProgress)}
-                {layersOnGpu > 0 && ` · ${layersOnGpu} layers on GPU`}
+                {layersOffloaded > 0 && ` · ${layersOffloaded} offloaded layers`}
+                {allocatedDevices.length > 0 && ` · Sharded across: ${allocatedDevices.join(', ')}`}
               </span>
             </div>
           ) : (

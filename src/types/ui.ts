@@ -33,6 +33,11 @@ export type ChatMessage = {
   tokensPerSec?: number;
 };
 
+export type RequestChatMessage = ChatMessage | {
+  role: 'system';
+  content: string;
+};
+
 export type Device = {
   id: string;
   name: string;
@@ -95,4 +100,56 @@ export type ChatEvent = ChatEventRequest & {
 
 export type ChatSessionDetail = ChatSession & {
   events: ChatEvent[];
+};
+
+export type LoadingStatus = {
+  model: string;
+  phase: string;
+  progress: number;
+  layers_on_gpu: number;
+  layers_offloaded: number;
+  node_count: number;
+};
+
+export type ParallelismTarget = {
+  parallelism_target: number;
+};
+
+export type AllocationDevice = {
+  node_id: string;
+  ip: string;
+  port: number;
+  hardware_model: string;
+  label: string;
+};
+
+export type AllocationsResponse = {
+  model: string;
+  devices: AllocationDevice[];
+};
+
+export type MetricsRequest = {
+  id: number;
+  model: string;
+  path: string;
+  started_at: string;
+  completed_at: string;
+  duration_ms: number;
+  response_bytes: number;
+  streamed_text_bytes: number;
+  tokens_streamed: number;
+  tokens_per_second: number;
+  allocated_node_count: number;
+  allocated_node_ids: string[];
+};
+
+export type MetricsSnapshot = {
+  summary: {
+    request_count: number;
+    avg_duration_ms: number;
+    avg_tokens_per_second: number;
+    total_response_bytes: number;
+    total_tokens_streamed: number;
+  };
+  requests: MetricsRequest[];
 };

@@ -8,6 +8,9 @@ export const apiRoutes = {
   uiDashboard: '/api/ui/dashboard',
   uiConnectInfo: '/api/ui/connect-info',
   uiChats: '/api/ui/chats',
+  uiParallelismTarget: '/api/ui/parallelism-target',
+  uiAllocations: '/api/ui/allocations',
+  uiMetrics: '/api/ui/metrics',
   devicesRegister: '/api/v1/devices/register',
 } as const;
 

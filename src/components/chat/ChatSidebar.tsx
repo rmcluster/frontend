@@ -5,6 +5,7 @@ import { useModels } from '../../context/ModelsContext';
 import { ThemeToggle } from '../ThemeToggle';
 import { buildChatPath } from '../../lib/routes';
 import { Plus, X } from 'lucide-react';
+import { chooseDefaultModel } from '../../pages/chatPageLogic';
 
 function relativeDate(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -43,7 +44,7 @@ export function ChatSidebar() {
   useEffect(() => {
     if (!selectedModel && models.length > 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedModel(models[0].model);
+      setSelectedModel(chooseDefaultModel(models));
     }
   }, [models, selectedModel]);
 

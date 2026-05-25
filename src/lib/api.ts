@@ -1,4 +1,12 @@
-import type { ChatMessage, ChatEventRequest, ChatSession } from '../types/ui';
+import type {
+  AllocationsResponse,
+  ChatEventRequest,
+  ChatSession,
+  LoadingStatus,
+  MetricsSnapshot,
+  ParallelismTarget,
+  RequestChatMessage,
+} from '../types/ui';
 import { chatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
 
 export async function getJson<T>(path: string): Promise<T> {
@@ -58,13 +66,30 @@ export async function appendChatEvent(
   await postJson(chatEventsUrl(chatId), event);
 }
 
-export async function getLoadingStatus(): Promise<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }> {
-  return getJson<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }>('/api/ui/loading-status');
+export async function getLoadingStatus(): Promise<LoadingStatus> {
+  return getJson<LoadingStatus>('/api/ui/loading-status');
 }
 
+export async function getParallelismTarget(): Promise<ParallelismTarget> {
+  return getJson<ParallelismTarget>(apiRoutes.uiParallelismTarget);
+}
+
+export async function setParallelismTarget(parallelismTarget: number): Promise<ParallelismTarget> {
+  return postJson<ParallelismTarget>(apiRoutes.uiParallelismTarget, {
+    parallelism_target: parallelismTarget,
+  });
+}
+
+export async function getAllocations(model: string): Promise<AllocationsResponse> {
+  return getJson<AllocationsResponse>(`${apiRoutes.uiAllocations}?model=${encodeURIComponent(model)}`);
+}
+
+export async function getMetrics(): Promise<MetricsSnapshot> {
+  return getJson<MetricsSnapshot>(apiRoutes.uiMetrics);
+}
 
 export async function* streamChat(
-  messages: ChatMessage[],
+  messages: RequestChatMessage[],
   model: string,
   signal: AbortSignal
 ): AsyncGenerator<string> {
@@ -81,6 +106,7 @@ export async function* streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
+  let inThinkingBlock = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -96,13 +122,40 @@ export async function* streamChat(
       if (data === '[DONE]') return;
       try {
         const parsed = JSON.parse(data) as {
-          choices: Array<{ delta: { content?: string } }>;
+          choices: Array<{
+            delta: {
+              content?: string;
+              reasoning_content?: string;
+            };
+          }>;
         };
-        const delta = parsed.choices[0]?.delta?.content;
-        if (delta) yield delta;
+        const reasoningDelta = parsed.choices[0]?.delta?.reasoning_content;
+        const contentDelta = parsed.choices[0]?.delta?.content;
+
+        if (reasoningDelta) {
+          if (!inThinkingBlock) {
+            inThinkingBlock = true;
+            yield `<think>${reasoningDelta}`;
+          } else {
+            yield reasoningDelta;
+          }
+        }
+
+        if (contentDelta) {
+          if (inThinkingBlock) {
+            inThinkingBlock = false;
+            yield `</think>${contentDelta}`;
+          } else {
+            yield contentDelta;
+          }
+        }
       } catch {
         // skip malformed SSE line
       }
     }
+  }
+
+  if (inThinkingBlock) {
+    yield '</think>';
   }
 }

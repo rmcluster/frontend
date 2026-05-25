@@ -4,7 +4,7 @@ import { AddDeviceModal } from '../components/devices/AddDeviceModal';
 import { PageHeader } from '../components/PageHeader';
 import { getJson } from '../lib/api';
 import { apiRoutes } from '../lib/routes';
-import type { DashboardServer } from '../types/ui';
+import type { DashboardData, DashboardServer } from '../types/ui';
 
 export function DashboardPage() {
   const [servers, setServers] = useState<DashboardServer[]>([]);
@@ -20,7 +20,7 @@ export function DashboardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const payload = await getJson<{ servers: DashboardServer[] }>(
+        const payload = await getJson<DashboardData>(
           apiRoutes.uiDashboard
         );
         setServers(payload.servers);

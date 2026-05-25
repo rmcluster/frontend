@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 import { LogoIcon } from '../icons/LogoIcon';
+import { MqttMetrics } from './MqttMetrics';
 
 export function Navbar() {
   const { pathname } = useLocation();
@@ -41,6 +42,7 @@ export function Navbar() {
       </nav>
 
       <div className="flex items-center gap-2">
+        <MqttMetrics />
         <ThemeToggle />
       </div>
     </header>

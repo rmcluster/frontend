@@ -27,6 +27,13 @@ export type DashboardServer = {
   temperature?: number;
 };
 
+export type DashboardData = {
+  servers: DashboardServer[];
+  power_watts?: number;
+  voltage?: number;
+  current?: number;
+};
+
 export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;

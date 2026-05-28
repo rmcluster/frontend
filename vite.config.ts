@@ -2,23 +2,26 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
+const backendTarget = process.env.BACKEND_URL || 'http://127.0.0.1:4917';
+
 export default defineConfig({
   plugins: [tailwindcss(), react()],
   server: {
     port: 3000,
+    host: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:4917',
+        target: backendTarget,
         changeOrigin: true,
         timeout: 0,
       },
       '/v1': {
-        target: 'http://127.0.0.1:4917',
+        target: backendTarget,
         changeOrigin: true,
         timeout: 0,
       },
       '/dav': {
-        target: 'http://127.0.0.1:4917',
+        target: backendTarget,
         changeOrigin: true,
         timeout: 0,
       },

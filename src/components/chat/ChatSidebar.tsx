@@ -42,10 +42,15 @@ export function ChatSidebar() {
   // Auto-select the first model once the list loads
   useEffect(() => {
     if (!selectedModel && models.length > 0) {
+      const first = models[0].model;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedModel(models[0].model);
+      setSelectedModel(first);
+      // If the URL has no model param (e.g. navigated to /chat bare), stamp it in
+      if (!searchParams.get('model')) {
+        navigate(buildChatPath(first), { replace: true });
+      }
     }
-  }, [models, selectedModel]);
+  }, [models, selectedModel, searchParams, navigate]);
 
   const handleNewChat = () => {
     const conv = createConversation(selectedModel);

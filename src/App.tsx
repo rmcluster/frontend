@@ -5,6 +5,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ModelsPage } from './pages/ModelsPage';
 import { ChatPage } from './pages/ChatPage';
 import { FilesPage } from './pages/FilesPage';
+import { ToastOverlay } from './components/ToastOverlay';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/chat" element={<ChatPage />} />
         </Route>
       </Routes>
+      <ToastOverlay />
     </BrowserRouter>
   );
 }

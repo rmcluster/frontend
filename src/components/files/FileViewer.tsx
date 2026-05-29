@@ -29,6 +29,7 @@ export const FileViewer = forwardRef<FileViewerHandle, FileViewerProps>(
     const [loadingText, setLoadingText] = useState(false);
     const [saving, setSaving] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     const ext = extOf(entry.name);
     const kind = classify(entry.name, entry.contentType);
@@ -89,8 +90,11 @@ export const FileViewer = forwardRef<FileViewerHandle, FileViewerProps>(
       try {
         const blob = new Blob([textContent], { type: 'text/plain' });
         const res = await fetch(src, { method: 'PUT', body: blob });
-        if (!res.ok) throw new Error(`PUT ${res.status}`);
+        if (!res.ok) throw new Error(`Server returned ${res.status} ${res.statusText}`);
         setIsDirty(false);
+      } catch (e: unknown) {
+        setSaveError(e instanceof Error ? e.message : String(e));
+        throw e;
       } finally {
         setSaving(false);
       }
@@ -106,6 +110,14 @@ export const FileViewer = forwardRef<FileViewerHandle, FileViewerProps>(
 
     return (
       <div className="flex flex-col">
+        <ConfirmModal
+          open={saveError !== null}
+          title="Save failed"
+          message={saveError ?? ''}
+          onClose={() => setSaveError(null)}
+          actions={[{ label: 'Dismiss', variant: 'danger', onClick: () => setSaveError(null) }]}
+        />
+
         <ConfirmModal
           open={showLeaveWarning}
           title="Unsaved changes"

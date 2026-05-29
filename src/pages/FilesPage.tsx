@@ -19,7 +19,17 @@ import { NewFolderModal } from '../components/files/NewFolderModal';
 import { NewFileModal } from '../components/files/NewFileModal';
 import { UploadButton } from '../components/files/UploadButton';
 import { StateDisplay, SkeletonRows } from '../components/StateDisplay';
-import { ChevronLeft, FilePlus, Plus, List, LayoutGrid } from 'lucide-react';
+import { getJson } from '../lib/api';
+import { apiRoutes, DAV_BASE } from '../lib/routes';
+import type { ConnectInfo } from '../types/ui';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+} from '../components/ui/AlertDialog';
+import { ChevronLeft, FilePlus, Plus, List, LayoutGrid, Network } from 'lucide-react';
 
 export function FilesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,6 +54,22 @@ export function FilesPage() {
   const viewerRef = useRef<FileViewerHandle>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [davUrl, setDavUrl] = useState<string>('');
+  const [davModalOpen, setDavModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    void getJson<ConnectInfo>(apiRoutes.uiConnectInfo)
+      .then((info) => setDavUrl(`http://${info.host}:${info.port}${DAV_BASE}`))
+      .catch(() => setDavUrl(`${window.location.origin}${DAV_BASE}`));
+  }, []);
+
+  function handleCopyDavUrl() {
+    void navigator.clipboard.writeText(davUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   async function handleSave() {
     if (!viewerRef.current) return;
@@ -52,6 +78,8 @@ export function FilesPage() {
       await viewerRef.current.save();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // error is displayed inside FileViewer via its save-error modal
     } finally {
       setSaving(false);
     }
@@ -246,20 +274,20 @@ export function FilesPage() {
               </button>
 
               {viewingKind === 'text' && viewingIsStructured && (
-                <div className="flex items-center gap-0.5 bg-(--bg-elevated) rounded-md shrink-0">
+                <>
                   <button
                     onClick={() => handleFileModeChange('preview')}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer outline-none ${viewingPreview ? 'bg-(--accent) text-white' : 'text-(--text-muted) hover:text-(--text-primary)'}`}
+                    className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer outline-none ${viewingPreview ? 'bg-(--accent) text-white' : 'bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent)'}`}
                   >
                     Preview
                   </button>
                   <button
                     onClick={() => handleFileModeChange('edit')}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer outline-none ${!viewingPreview ? 'bg-(--accent) text-white' : 'text-(--text-muted) hover:text-(--text-primary)'}`}
+                    className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer outline-none ${!viewingPreview ? 'bg-(--accent) text-white' : 'bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent)'}`}
                   >
                     Edit
                   </button>
-                </div>
+                </>
               )}
 
               {viewingKind === 'text' && (
@@ -282,6 +310,13 @@ export function FilesPage() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDavModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors cursor-pointer outline-none"
+              >
+                <Network size={14} />
+                Connect
+              </button>
               <button
                 onClick={() => setFileModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors cursor-pointer outline-none"
@@ -391,6 +426,35 @@ export function FilesPage() {
         onClose={() => setFileModalOpen(false)}
         onCreate={handleCreateFile}
       />
+
+      <AlertDialog open={davModalOpen} onOpenChange={(o) => !o && setDavModalOpen(false)}>
+        <AlertDialogContent maxWidth="max-w-lg">
+          <AlertDialogTitle>Connect via WebDAV</AlertDialogTitle>
+          <AlertDialogDescription>
+            Mount this address in Finder, Windows Explorer, or any WebDAV client to access your files directly from your filesystem.
+          </AlertDialogDescription>
+          <div className="mb-6 flex items-center gap-2">
+            <code className="flex-1 px-3 py-2 text-sm font-mono rounded-md bg-(--bg-elevated) border border-(--border) text-(--text-primary) truncate">
+              {davUrl}
+            </code>
+            <button
+              onClick={handleCopyDavUrl}
+              className="shrink-0 inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-(--accent) text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <AlertDialogFooter>
+            <button
+              type="button"
+              onClick={() => setDavModalOpen(false)}
+              className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-(--bg-elevated) text-(--text-primary) border border-(--border) hover:border-(--accent) transition-colors cursor-pointer outline-none"
+            >
+              Close
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

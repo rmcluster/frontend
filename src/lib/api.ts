@@ -1,4 +1,9 @@
-import type { ChatMessage, ChatEventRequest, ChatSession } from '../types/ui';
+import type {
+  ChatEventRequest,
+  ChatSession,
+  ParallelismTarget,
+  StorageChunkSize,
+} from '../types/ui';
 import { chatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
 
 export async function getJson<T>(path: string): Promise<T> {
@@ -60,6 +65,26 @@ export async function appendChatEvent(
 
 export async function getLoadingStatus(): Promise<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }> {
   return getJson<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }>('/api/ui/loading-status');
+}
+
+export async function getParallelismTarget(): Promise<ParallelismTarget> {
+  return getJson<ParallelismTarget>(apiRoutes.uiParallelismTarget);
+}
+
+export async function setParallelismTarget(parallelismTarget: number): Promise<ParallelismTarget> {
+  return postJson<ParallelismTarget>(apiRoutes.uiParallelismTarget, {
+    parallelism_target: parallelismTarget,
+  });
+}
+
+export async function getStorageChunkSize(): Promise<StorageChunkSize> {
+  return getJson<StorageChunkSize>(apiRoutes.uiStorageChunkSize);
+}
+
+export async function setStorageChunkSize(chunkSizeBytes: number): Promise<StorageChunkSize> {
+  return postJson<StorageChunkSize>(apiRoutes.uiStorageChunkSize, {
+    chunk_size_bytes: chunkSizeBytes,
+  });
 }
 
 

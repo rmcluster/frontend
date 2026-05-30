@@ -97,3 +97,21 @@ export type ChatEvent = ChatEventRequest & {
 export type ChatSessionDetail = ChatSession & {
   events: ChatEvent[];
 };
+
+export type LoadingStatus = {
+  model: string;
+  phase: string;
+  progress: number;
+  layers_on_gpu: number;
+  layers_offloaded: number;
+  node_count: number;
+};
+
+export type ParallelismTarget = {
+  parallelism_target: number;
+};
+
+export type StorageChunkSize = {
+  chunk_size_bytes: number;
+};
+

@@ -1,8 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { LogoIcon } from '../icons/LogoIcon';
 
-export function Navbar() {
+type NavbarProps = {
+  onOpenSettings?: () => void;
+};
+
+export function Navbar({ onOpenSettings }: NavbarProps) {
   const { pathname } = useLocation();
 
   const navLinks = [
@@ -41,6 +46,15 @@ export function Navbar() {
       </nav>
 
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-(--text-muted) transition-colors hover:bg-(--bg-elevated) hover:text-(--text-primary) cursor-pointer"
+          aria-label="Open settings"
+          title="Settings"
+        >
+          <Settings size={16} />
+        </button>
         <ThemeToggle />
       </div>
     </header>

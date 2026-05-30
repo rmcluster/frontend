@@ -6,12 +6,30 @@ import type {
 } from '../types/ui';
 import { chatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
 
+async function readErrorMessage(response: Response): Promise<string> {
+  const text = await response.text();
+  if (!text) {
+    return `Request failed with status ${response.status}`;
+  }
+  try {
+    const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error.trim()) {
+      return parsed.error;
+    }
+    if (typeof parsed.message === 'string' && parsed.message.trim()) {
+      return parsed.message;
+    }
+  } catch {
+  }
+  return text;
+}
+
 export async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
     headers: { Accept: 'application/json' },
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new Error(await readErrorMessage(response));
   }
   return response.json() as Promise<T>;
 }
@@ -26,7 +44,7 @@ export async function postJson<TResponse>(
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new Error(await readErrorMessage(response));
   }
   return response.json() as Promise<TResponse>;
 }
@@ -40,7 +58,7 @@ export async function postForm<TResponse>(
     body,
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new Error(await readErrorMessage(response));
   }
   return response.json() as Promise<TResponse>;
 }
@@ -100,7 +118,7 @@ export async function* streamChat(
     signal,
   });
 
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await readErrorMessage(res));
   if (!res.body) return;
 
   const reader = res.body.getReader();

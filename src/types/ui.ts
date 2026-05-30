@@ -21,6 +21,7 @@ export type DashboardServer = {
   id: string;
   ip: string;
   port: number;
+  nickname?: string;
   hardware_model: string;
   max_size?: number;
   battery?: number;

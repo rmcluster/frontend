@@ -14,7 +14,7 @@ export function ServersTable({ servers, loading }: ServersTableProps) {
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            {['IP', 'Port', 'Hardware', 'Max Size', 'Battery', 'Temperature'].map((h) => (
+            {['Nickname', 'IP', 'Port', 'Hardware', 'Max Size', 'Battery', 'Temperature'].map((h) => (
               <th
                 key={h}
                 className="font-(--font-mono) text-[0.72rem] uppercase tracking-[0.08em] text-(--text-muted) px-4 py-3 border-b border-(--border) text-left whitespace-nowrap"
@@ -28,7 +28,7 @@ export function ServersTable({ servers, loading }: ServersTableProps) {
           {servers.length === 0 ? (
             <tr>
               <td
-                colSpan={6}
+                colSpan={7}
                 className="px-4 py-4 text-(--text-primary) text-sm border-b border-(--border-subtle) align-middle"
               >
                 No clients connected.
@@ -40,7 +40,7 @@ export function ServersTable({ servers, loading }: ServersTableProps) {
                 key={server.id}
                 className="hover:[&>td]:bg-(--bg-elevated)"
               >
-                {[server.ip, server.port, server.hardware_model || '—', server.max_size ?? '—', server.battery ?? '—', server.temperature ?? '—'].map((val, i) => (
+                {[server.nickname || '—', server.ip, server.port, server.hardware_model || '—', server.max_size ?? '—', server.battery ?? '—', server.temperature ?? '—'].map((val, i) => (
                   <td
                     key={i}
                     className="px-4 py-4 border-b border-(--border-subtle) align-middle text-sm text-(--text-primary) transition-colors last:border-b-0"

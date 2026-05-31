@@ -14,6 +14,7 @@ export default defineConfig({
         target: backendTarget,
         changeOrigin: true,
         timeout: 0,
+        xfwd: true,
       },
       '/v1': {
         target: backendTarget,

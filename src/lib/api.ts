@@ -81,8 +81,8 @@ export async function appendChatEvent(
   await postJson(chatEventsUrl(chatId), event);
 }
 
-export async function getLoadingStatus(): Promise<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }> {
-  return getJson<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }>('/api/ui/loading-status');
+export async function getLoadingStatus(): Promise<{ model: string; phase: string; progress: number; layers_on_rpc: number; node_count: number }> {
+  return getJson<{ model: string; phase: string; progress: number; layers_on_rpc: number; node_count: number }>('/api/ui/loading-status');
 }
 
 export async function getParallelismTarget(): Promise<ParallelismTarget> {

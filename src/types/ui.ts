@@ -102,7 +102,7 @@ export type LoadingStatus = {
   model: string;
   phase: string;
   progress: number;
-  layers_on_gpu: number;
+  layers_on_rpc: number;
   layers_offloaded: number;
   node_count: number;
 };
@@ -114,4 +114,3 @@ export type ParallelismTarget = {
 export type StorageChunkSize = {
   chunk_size_bytes: number;
 };
-

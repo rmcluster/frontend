@@ -9,7 +9,7 @@ export type StreamEntry = {
   streamingContent: string;
   loadingPhase: string;
   loadingProgress: number;
-  layersOnGpu: number;
+  layersOnRpc: number;
 };
 
 export type StreamToast = {
@@ -24,7 +24,7 @@ const emptyEntry: StreamEntry = {
   streamingContent: '',
   loadingPhase: '',
   loadingProgress: 0,
-  layersOnGpu: 0,
+  layersOnRpc: 0,
 };
 
 export type StartStreamParams = {
@@ -122,7 +122,7 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
         if (assistantContent !== '') { clearInterval(phaseInterval); return; }
         void getLoadingStatus().then((s) => {
           if (assistantContent === '') {
-            patch(convId, { loadingPhase: s.phase, loadingProgress: s.progress, layersOnGpu: s.layers_on_gpu });
+            patch(convId, { loadingPhase: s.phase, loadingProgress: s.progress, layersOnRpc: s.layers_on_rpc });
           }
         }).catch(() => undefined);
       }, 1200);

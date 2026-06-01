@@ -10,7 +10,7 @@ type ChatMessagesProps = {
   streamingContent: string;
   loadingPhase?: string;
   loadingProgress?: number;
-  layersOnGpu?: number;
+  layersOnRpc?: number;
 };
 
 function phaseLabel(phase: string, progress: number): string {
@@ -115,7 +115,7 @@ export function ChatMessages({
   streamingContent,
   loadingPhase,
   loadingProgress = 0,
-  layersOnGpu = 0,
+  layersOnRpc = 0,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -132,6 +132,8 @@ export function ChatMessages({
   return (
     <div className="chat-messages flex-1 overflow-y-auto px-6 pt-6 pb-4 flex flex-col gap-5">
       {messages.map((msg, idx) => {
+        if (msg.role === 'system') return null;
+
         // The empty assistant placeholder added at the start of streaming is
         // visually covered by the typing indicator — skip it to avoid a double row.
         if (msg.role === 'assistant' && msg.content === '') return null;
@@ -183,35 +185,6 @@ export function ChatMessages({
           </div>
         );
       })}
-
-      {/* Live streaming message */}
-      {streaming &&
-        streamingContent !== '' &&
-        (() => {
-          const { thinking, response, thinkingComplete } =
-            parseThinking(streamingContent);
-          return (
-            <div className="flex gap-3 max-w-195 w-full self-start">
-              <div className={assistantAvatar}>
-                <ClusterIcon />
-              </div>
-              <div className={assistantBubble}>
-                {thinking && (
-                  <ThinkingBlock
-                    thinking={thinking}
-                    thinkingComplete={thinkingComplete}
-                  />
-                )}
-                {response && (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {response}
-                  </ReactMarkdown>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
       {/* Status indicator while waiting for first token */}
       {streaming && streamingContent === '' && (
         <div className="flex gap-3 max-w-195 w-full self-start">
@@ -225,7 +198,7 @@ export function ChatMessages({
               <span className="typing-dot" />
               <span className="typing-status-text">
                 {phaseLabel(loadingPhase, loadingProgress)}
-                {layersOnGpu > 0 && ` · ${layersOnGpu} layers on GPU`}
+                {layersOnRpc > 0 && ` · ${layersOnRpc} layers on RPC nodes`}
               </span>
             </div>
           ) : (

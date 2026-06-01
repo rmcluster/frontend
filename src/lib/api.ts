@@ -1,10 +1,23 @@
 import type {
   ChatEventRequest,
+  ChatRunSnapshot,
+  ChatRunStreamEvent,
   ChatSession,
+  ChatMessage,
+  Conversation,
+  LoadingStatus,
   ParallelismTarget,
   StorageChunkSize,
 } from '../types/ui';
-import { chatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
+import {
+  apiRoutes,
+  chatEventsUrl,
+  chatRunsUrl,
+  currentChatRunStreamUrl,
+  currentChatRunUrl,
+  deleteChatSessionUrl,
+  stopCurrentChatRunUrl,
+} from './routes';
 
 async function readErrorMessage(response: Response): Promise<string> {
   const text = await response.text();
@@ -20,6 +33,7 @@ async function readErrorMessage(response: Response): Promise<string> {
       return parsed.message;
     }
   } catch {
+    // Ignore JSON parse errors and fall back to the raw response text.
   }
   return text;
 }
@@ -42,6 +56,16 @@ export async function postJson<TResponse>(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+  return response.json() as Promise<TResponse>;
+}
+
+export async function deleteJson<TResponse>(path: string): Promise<TResponse> {
+  const response = await fetch(path, {
+    method: 'DELETE',
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response));
@@ -74,6 +98,15 @@ export async function startChatSession(
   });
 }
 
+export async function listConversations(): Promise<Conversation[]> {
+  const payload = await getJson<{ conversations: Conversation[] }>(apiRoutes.uiChats);
+  return payload.conversations;
+}
+
+export async function deleteConversation(chatId: string): Promise<{ status: string }> {
+  return deleteJson<{ status: string }>(deleteChatSessionUrl(chatId));
+}
+
 export async function appendChatEvent(
   chatId: string,
   event: ChatEventRequest
@@ -81,8 +114,46 @@ export async function appendChatEvent(
   await postJson(chatEventsUrl(chatId), event);
 }
 
-export async function getLoadingStatus(): Promise<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }> {
-  return getJson<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }>('/api/ui/loading-status');
+export async function startChatRun(
+  chatId: string,
+  body: {
+    model: string;
+    messages: Array<Pick<ChatMessage, 'role' | 'content'>>;
+    thinking_enabled: boolean;
+  }
+): Promise<ChatRunSnapshot> {
+  return postJson<ChatRunSnapshot>(chatRunsUrl(chatId), body);
+}
+
+export async function getCurrentChatRun(chatId: string): Promise<ChatRunSnapshot> {
+  return getJson<ChatRunSnapshot>(currentChatRunUrl(chatId));
+}
+
+export async function stopCurrentChatRun(chatId: string): Promise<{ status: string }> {
+  return postJson<{ status: string }>(stopCurrentChatRunUrl(chatId), {});
+}
+
+export function subscribeToChatRun(
+  chatId: string,
+  onEvent: (event: ChatRunStreamEvent) => void,
+  onError?: () => void
+): EventSource {
+  const source = new EventSource(currentChatRunStreamUrl(chatId));
+  source.onmessage = (message) => {
+    try {
+      onEvent(JSON.parse(message.data) as ChatRunStreamEvent);
+    } catch {
+      // ignore malformed stream event
+    }
+  };
+  source.onerror = () => {
+    onError?.();
+  };
+  return source;
+}
+
+export async function getLoadingStatus(): Promise<LoadingStatus> {
+  return getJson<LoadingStatus>('/api/ui/loading-status');
 }
 
 export async function getParallelismTarget(): Promise<ParallelismTarget> {
@@ -103,49 +174,4 @@ export async function setStorageChunkSize(chunkSizeBytes: number): Promise<Stora
   return postJson<StorageChunkSize>(apiRoutes.uiStorageChunkSize, {
     chunk_size_bytes: chunkSizeBytes,
   });
-}
-
-
-export async function* streamChat(
-  messages: ChatMessage[],
-  model: string,
-  signal: AbortSignal
-): AsyncGenerator<string> {
-  const res = await fetch(chatCompletionsUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, stream: true }),
-    signal,
-  });
-
-  if (!res.ok) throw new Error(await readErrorMessage(res));
-  if (!res.body) return;
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split('\n');
-    buf = lines.pop() ?? '';
-
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') return;
-      try {
-        const parsed = JSON.parse(data) as {
-          choices: Array<{ delta: { content?: string } }>;
-        };
-        const delta = parsed.choices[0]?.delta?.content;
-        if (delta) yield delta;
-      } catch {
-        // skip malformed SSE line
-      }
-    }
-  }
 }

@@ -1,15 +1,21 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { streamChat, appendChatEvent, getLoadingStatus } from '../lib/api';
+import {
+  getCurrentChatRun,
+  getLoadingStatus,
+  startChatRun,
+  stopCurrentChatRun,
+  subscribeToChatRun,
+} from '../lib/api';
 import { useConversations } from './ConversationContext';
-import type { ChatMessage } from '../types/ui';
+import type { ChatMessage, ChatRunSnapshot, ChatRunStreamEvent } from '../types/ui';
 
 export type StreamEntry = {
   streaming: boolean;
   streamingContent: string;
   loadingPhase: string;
   loadingProgress: number;
-  layersOnGpu: number;
+  layersOnRpc: number;
 };
 
 export type StreamToast = {
@@ -24,7 +30,7 @@ const emptyEntry: StreamEntry = {
   streamingContent: '',
   loadingPhase: '',
   loadingProgress: 0,
-  layersOnGpu: 0,
+  layersOnRpc: 0,
 };
 
 export type StartStreamParams = {
@@ -47,22 +53,32 @@ type ChatStreamingContextValue = {
 
 const ChatStreamingContext = createContext<ChatStreamingContextValue | null>(null);
 
+function isRunActive(snapshot: ChatRunSnapshot): boolean {
+  return snapshot.status === 'starting' || snapshot.status === 'streaming';
+}
+
 export function ChatStreamingProvider({ children }: { children: ReactNode }) {
-  const { appendMessage, updateLastMessage, activeId } = useConversations();
+  const {
+    conversations,
+    appendMessages,
+    upsertAssistantMessage,
+    activeId,
+  } = useConversations();
   const [streams, setStreams] = useState<Record<string, StreamEntry>>({});
   const [nodeCount, setNodeCount] = useState(0);
   const [toasts, setToasts] = useState<StreamToast[]>([]);
-  const abortRefs = useRef<Record<string, AbortController>>({});
-  // Ref so async stream callbacks always see the current activeId without stale closure
+  const sourcesRef = useRef<Record<string, EventSource>>({});
+  const reconnectTimersRef = useRef<Record<string, number>>({});
+  const reconnectAttemptsRef = useRef<Record<string, number>>({});
+  const intentionalCloseRef = useRef<Set<string>>(new Set());
+  const hydratedRef = useRef<Set<string>>(new Set());
+  const hydrationPromiseRef = useRef<Record<string, Promise<ChatRunSnapshot | null>>>({});
   const activeIdRef = useRef<string | null>(activeId);
+
   useEffect(() => {
     activeIdRef.current = activeId;
-    if (activeId) {
-      setToasts((prev) => prev.filter((t) => t.convId !== activeId));
-    }
   }, [activeId]);
 
-  // Always-on slow poll for node count
   useEffect(() => {
     const fetch = () => {
       void getLoadingStatus().then((s) => setNodeCount(s.node_count)).catch(() => undefined);
@@ -79,9 +95,136 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const stopStream = useCallback((convId: string) => {
-    abortRefs.current[convId]?.abort();
+  const applySnapshot = useCallback((convId: string, snapshot: ChatRunSnapshot) => {
+    upsertAssistantMessage(convId, snapshot.assistant_content);
+    patch(convId, {
+      streaming: isRunActive(snapshot),
+      streamingContent: snapshot.assistant_content,
+      loadingPhase: snapshot.loading_phase,
+      loadingProgress: snapshot.loading_progress,
+      layersOnRpc: snapshot.layers_on_rpc,
+    });
+  }, [patch, upsertAssistantMessage]);
+
+  const clearReconnectTimer = useCallback((convId: string) => {
+    const timer = reconnectTimersRef.current[convId];
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      delete reconnectTimersRef.current[convId];
+    }
   }, []);
+
+  const closeSource = useCallback((convId: string, intentional = false) => {
+    clearReconnectTimer(convId);
+    if (intentional) {
+      intentionalCloseRef.current.add(convId);
+    }
+    sourcesRef.current[convId]?.close();
+    delete sourcesRef.current[convId];
+  }, [clearReconnectTimer]);
+
+  const scheduleReconnect = useCallback((convId: string, convTitle: string, model: string) => {
+    if (intentionalCloseRef.current.has(convId) || reconnectTimersRef.current[convId] !== undefined) {
+      return;
+    }
+
+    const attempt = reconnectAttemptsRef.current[convId] ?? 0;
+    const delay = Math.min(1000 * (attempt + 1), 5000);
+    reconnectTimersRef.current[convId] = window.setTimeout(() => {
+      delete reconnectTimersRef.current[convId];
+      void getCurrentChatRun(convId)
+        .then((snapshot) => {
+          applySnapshot(convId, snapshot);
+          if (isRunActive(snapshot) && !intentionalCloseRef.current.has(convId)) {
+            reconnectAttemptsRef.current[convId] = attempt + 1;
+            attachSource(convId, convTitle, model);
+          }
+        })
+        .catch(() => {
+          reconnectAttemptsRef.current[convId] = attempt + 1;
+          scheduleReconnect(convId, convTitle, model);
+        });
+    }, delay);
+  }, [applySnapshot]);
+
+  const attachSource = useCallback((convId: string, convTitle: string, model: string) => {
+    closeSource(convId);
+    intentionalCloseRef.current.delete(convId);
+    reconnectAttemptsRef.current[convId] = 0;
+    const source = subscribeToChatRun(
+      convId,
+      (event: ChatRunStreamEvent) => {
+        applySnapshot(convId, event.snapshot);
+        if (!isRunActive(event.snapshot)) {
+          closeSource(convId, true);
+          if (event.snapshot.status === 'completed' && activeIdRef.current !== convId) {
+            setToasts((prev) => [
+              ...prev,
+              { id: crypto.randomUUID(), convId, convTitle, model },
+            ]);
+          }
+        }
+      },
+      () => {
+        if (intentionalCloseRef.current.has(convId)) {
+          closeSource(convId, true);
+          return;
+        }
+        closeSource(convId);
+        scheduleReconnect(convId, convTitle, model);
+      }
+    );
+    sourcesRef.current[convId] = source;
+  }, [applySnapshot, closeSource, scheduleReconnect]);
+
+  const hydrateRun = useCallback((convId: string, convTitle: string, model: string): Promise<ChatRunSnapshot | null> => {
+    const existing = hydrationPromiseRef.current[convId];
+    if (existing) return existing;
+
+    const pending = getCurrentChatRun(convId)
+      .then((snapshot) => {
+        applySnapshot(convId, snapshot);
+        if (isRunActive(snapshot)) {
+          attachSource(convId, convTitle, model);
+        }
+        return snapshot;
+      })
+      .catch(() => null)
+      .finally(() => {
+        delete hydrationPromiseRef.current[convId];
+      });
+
+    hydrationPromiseRef.current[convId] = pending;
+    return pending;
+  }, [applySnapshot, attachSource]);
+
+  useEffect(() => {
+    conversations.forEach((conv) => {
+      if (hydratedRef.current.has(conv.id)) return;
+      hydratedRef.current.add(conv.id);
+      void hydrateRun(conv.id, conv.title, conv.model);
+    });
+  }, [conversations, hydrateRun]);
+
+  useEffect(() => () => {
+    Object.values(sourcesRef.current).forEach((source) => source.close());
+    sourcesRef.current = {};
+    Object.values(reconnectTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    reconnectTimersRef.current = {};
+  }, []);
+
+  const stopStream = useCallback((convId: string) => {
+    intentionalCloseRef.current.add(convId);
+    void stopCurrentChatRun(convId)
+      .then(async () => {
+        const snapshot = await getCurrentChatRun(convId);
+        applySnapshot(convId, snapshot);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        closeSource(convId, true);
+      });
+  }, [applySnapshot, closeSource]);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -90,111 +233,52 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
   const startStream = useCallback(({
     convId, model, content, prevMessages, thinkingEnabled, convTitle,
   }: StartStreamParams) => {
-    abortRefs.current[convId]?.abort();
-    const controller = new AbortController();
-    abortRefs.current[convId] = controller;
-
-    appendMessage(convId, { role: 'user', content });
-    appendMessage(convId, { role: 'assistant', content: '' });
-
-    void appendChatEvent(convId, {
-      event_type: 'message_sent',
-      role: 'user',
-      content,
-      timestamp: new Date().toISOString(),
-    }).catch(() => undefined);
-
-    patch(convId, { streaming: true, streamingContent: '', loadingPhase: '', loadingProgress: 0 });
-
-    const history: ChatMessage[] = [
-      ...(!thinkingEnabled ? [{ role: 'system' as const, content: '/no_think' }] : []),
-      ...prevMessages,
-      { role: 'user' as const, content },
-    ];
+    closeSource(convId, true);
+    intentionalCloseRef.current.delete(convId);
 
     void (async () => {
-      let assistantContent = '';
-      let firstTokenTime: number | null = null;
-      let tokenCount = 0;
+      const existingRun = await hydrateRun(convId, convTitle, model);
+      if (existingRun && isRunActive(existingRun)) {
+        return;
+      }
 
-      // Poll loading phase until first token arrives
-      const phaseInterval = setInterval(() => {
-        if (assistantContent !== '') { clearInterval(phaseInterval); return; }
-        void getLoadingStatus().then((s) => {
-          if (assistantContent === '') {
-            patch(convId, { loadingPhase: s.phase, loadingProgress: s.progress, layersOnGpu: s.layers_on_gpu });
-          }
-        }).catch(() => undefined);
-      }, 1200);
+      appendMessages(convId, [
+        { role: 'user', content },
+        { role: 'assistant', content: '' },
+      ]);
+      patch(convId, { streaming: true, streamingContent: '', loadingPhase: '', loadingProgress: 0, layersOnRpc: 0 });
 
-      const attemptStream = async (isRetry: boolean): Promise<boolean> => {
-        if (isRetry) {
-          await new Promise((r) => setTimeout(r, 2000));
-          if (controller.signal.aborted) return false;
-        }
-        for await (const token of streamChat(history, model, controller.signal)) {
-          if (firstTokenTime === null) firstTokenTime = Date.now();
-          tokenCount += 1;
-          assistantContent += token;
-          patch(convId, { streamingContent: assistantContent, loadingPhase: '' });
-        }
-        return true;
-      };
-
-      const finalize = (tps?: number) => {
-        updateLastMessage(convId, () => assistantContent, tps);
-        void appendChatEvent(convId, {
-          event_type: 'message_completed',
-          role: 'assistant',
-          content: assistantContent,
-          timestamp: new Date().toISOString(),
-        }).catch(() => undefined);
-        if (activeIdRef.current !== convId) {
-          setToasts((prev) => [...prev, {
-            id: crypto.randomUUID(), convId, convTitle, model,
-          }]);
-        }
-      };
-
-      const calcTps = () =>
-        firstTokenTime !== null && tokenCount > 0
-          ? tokenCount / ((Date.now() - firstTokenTime) / 1000)
-          : undefined;
+      const messages: Array<Pick<ChatMessage, 'role' | 'content'>> = [
+        ...prevMessages.map((message) => ({ role: message.role, content: message.content })),
+        { role: 'user' as const, content },
+      ];
 
       try {
-        let ok = await attemptStream(false);
-        if (!ok) throw new DOMException('Aborted', 'AbortError');
-        if (assistantContent === '') {
-          ok = await attemptStream(true);
-          if (!ok) throw new DOMException('Aborted', 'AbortError');
-        }
-        finalize(calcTps());
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          try {
-            await attemptStream(true);
-            finalize(calcTps());
-          } catch (retryErr) {
-            if ((retryErr as Error).name !== 'AbortError') {
-              updateLastMessage(convId, (prev) => prev || '_(Error: could not reach model server)_');
-              void appendChatEvent(convId, {
-                event_type: 'stream_error',
-                error: (retryErr as Error).message,
-                timestamp: new Date().toISOString(),
-              }).catch(() => undefined);
-            }
-          }
-        }
-      } finally {
-        clearInterval(phaseInterval);
-        patch(convId, { streaming: false, streamingContent: '', loadingPhase: '' });
-        delete abortRefs.current[convId];
+        const snapshot = await startChatRun(convId, {
+          model,
+          messages,
+          thinking_enabled: thinkingEnabled,
+        });
+        applySnapshot(convId, snapshot);
+        attachSource(convId, convTitle, model);
+      } catch {
+        upsertAssistantMessage(convId, '_(Error: could not reach model server)_');
+        patch(convId, { streaming: false, loadingPhase: '', loadingProgress: 0 });
       }
     })();
-  }, [appendMessage, updateLastMessage, patch]);
+  }, [appendMessages, attachSource, applySnapshot, closeSource, hydrateRun, patch, upsertAssistantMessage]);
 
   return (
-    <ChatStreamingContext.Provider value={{ streams, nodeCount, toasts, startStream, stopStream, dismissToast }}>
+    <ChatStreamingContext.Provider
+      value={{
+        streams,
+        nodeCount,
+        toasts: activeId ? toasts.filter((toast) => toast.convId !== activeId) : toasts,
+        startStream,
+        stopStream,
+        dismissToast,
+      }}
+    >
       {children}
     </ChatStreamingContext.Provider>
   );

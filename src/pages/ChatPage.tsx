@@ -14,7 +14,7 @@ const emptyStream = {
   streamingContent: '',
   loadingPhase: '',
   loadingProgress: 0,
-  layersOnGpu: 0,
+  layersOnRpc: 0,
 };
 
 export function ChatPage() {
@@ -58,7 +58,7 @@ export function ChatPage() {
   const messages = activeConv?.messages ?? [];
   const model = activeConv?.model ?? modelParam;
 
-  const { streaming, streamingContent, loadingPhase, loadingProgress, layersOnGpu } =
+  const { streaming, streamingContent, loadingPhase, loadingProgress, layersOnRpc } =
     (activeId ? streams[activeId] : null) ?? emptyStream;
 
   const thinkingSupported = models.find((m) => m.model === model)?.supports_thinking ?? false;
@@ -135,7 +135,7 @@ export function ChatPage() {
         streamingContent={streamingContent}
         loadingPhase={loadingPhase}
         loadingProgress={loadingProgress}
-        layersOnGpu={layersOnGpu}
+        layersOnRpc={layersOnRpc}
       />
       <ChatComposer
         onSend={handleSend}

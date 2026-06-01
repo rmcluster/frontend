@@ -23,7 +23,6 @@ export function ChatSidebar() {
     conversations,
     activeId,
     setActiveId,
-    createConversation,
     updateConversationModel,
     deleteConversation,
   } = useConversations();
@@ -53,9 +52,8 @@ export function ChatSidebar() {
   }, [models, selectedModel, searchParams, navigate]);
 
   const handleNewChat = () => {
-    const conv = createConversation(selectedModel);
-    setActiveId(conv.id);
-    navigate(buildChatPath(selectedModel, conv.id));
+    setActiveId(null);
+    navigate(buildChatPath(selectedModel));
   };
 
   const handleSelectConv = (id: string, model: string) => {
@@ -83,12 +81,9 @@ export function ChatSidebar() {
                   const hasMessages = (activeConv?.messages.length ?? 0) > 0;
                   if (!hasMessages) {
                     if (activeId && activeConv) {
-                      // Reuse the existing empty conversation — just swap its model
                       updateConversationModel(activeId, newModel);
-                      navigate(buildChatPath(newModel, activeId));
-                    } else {
-                      navigate(buildChatPath(newModel));
                     }
+                    navigate(buildChatPath(newModel));
                   }
                 }}
               >

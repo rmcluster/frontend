@@ -29,7 +29,7 @@ export type DashboardServer = {
 };
 
 export type ChatMessage = {
-  role: 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant';
   content: string;
   tokensPerSec?: number;
 };
@@ -56,6 +56,7 @@ export type Conversation = {
   messages: ChatMessage[];
   created_at: string;
   updated_at: string;
+  status?: string;
 };
 
 export type ConnectInfo = {
@@ -78,7 +79,8 @@ export type ChatEventType =
   | 'token_received'
   | 'message_completed'
   | 'stream_error'
-  | 'chat_closed';
+  | 'chat_closed'
+  | 'message_stopped';
 
 export type ChatEventRequest = {
   event_type: ChatEventType;
@@ -96,6 +98,33 @@ export type ChatEvent = ChatEventRequest & {
 
 export type ChatSessionDetail = ChatSession & {
   events: ChatEvent[];
+};
+
+export type ChatRunStatus =
+  | 'starting'
+  | 'streaming'
+  | 'stopped'
+  | 'completed'
+  | 'error';
+
+export type ChatRunSnapshot = {
+  chat_id: string;
+  model: string;
+  status: ChatRunStatus;
+  assistant_content: string;
+  loading_phase: string;
+  loading_progress: number;
+  layers_on_rpc: number;
+  started_at: string;
+  updated_at: string;
+  error?: string;
+  sequence: number;
+};
+
+export type ChatRunStreamEvent = {
+  type: 'snapshot' | 'delta' | 'completed' | 'stopped' | 'error';
+  snapshot: ChatRunSnapshot;
+  delta?: string;
 };
 
 export type LoadingStatus = {

@@ -32,3 +32,23 @@ export function chatEventsUrl(chatId: string): string {
 export function chatSessionUrl(chatId: string): string {
   return `/api/ui/chats/${chatId}`;
 }
+
+export function deleteChatSessionUrl(chatId: string): string {
+  return `/api/ui/chats/${chatId}`;
+}
+
+export function chatRunsUrl(chatId: string): string {
+  return `/api/ui/chats/${chatId}/runs`;
+}
+
+export function currentChatRunUrl(chatId: string): string {
+  return `/api/ui/chats/${chatId}/runs/current`;
+}
+
+export function currentChatRunStreamUrl(chatId: string): string {
+  return `/api/ui/chats/${chatId}/runs/current/stream`;
+}
+
+export function stopCurrentChatRunUrl(chatId: string): string {
+  return `/api/ui/chats/${chatId}/runs/current/stop`;
+}

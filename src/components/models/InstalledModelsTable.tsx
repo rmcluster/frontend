@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { SkeletonRow } from '../SkeletonBlock';
 import { useModels } from '../../context/ModelsContext';
 import { modelCacheStatusLabel, type ModelCacheStatus } from '../../lib/modelCache';
+import { useModels } from '../../context/ModelsContext';
+import { modelCacheStatusLabel, type ModelCacheStatus } from '../../lib/modelCache';
 import { buildChatPath } from '../../lib/routes';
 
 type InstalledModelsTableProps = {

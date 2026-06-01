@@ -1,3 +1,8 @@
+export type ModelCacheEntry = {
+  repo: string;
+  quant: string;
+};
+
 export type Model = {
   model: string;
   display_name: string;

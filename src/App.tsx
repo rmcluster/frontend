@@ -6,6 +6,7 @@ import { ModelsPage } from './pages/ModelsPage';
 import { ChatPage } from './pages/ChatPage';
 import { FilesPage } from './pages/FilesPage';
 import { ToastOverlay } from './components/ToastOverlay';
+import { ModelsProvider } from './context/ModelsContext';
 
 export default function App() {
   return (
@@ -13,7 +14,14 @@ export default function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/models" element={<ModelsPage />} />
+          <Route
+            path="/models"
+            element={
+              <ModelsProvider>
+                <ModelsPage />
+              </ModelsProvider>
+            }
+          />
           <Route path="/files" element={<FilesPage />} />
         </Route>
         <Route element={<ChatLayout />}>

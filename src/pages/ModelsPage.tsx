@@ -1,18 +1,106 @@
 import * as React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InstalledModelsTable } from '../components/models/InstalledModelsTable';
 import { LocalModelModal } from '../components/models/LocalModelModal';
 import { ModelSearchResultsTable } from '../components/models/ModelSearchResultsTable';
 import { PageHeader } from '../components/PageHeader';
+import { useModels } from '../context/ModelsContext';
 import { getJson, postForm, postJson } from '../lib/api';
+import {
+  hfRepoFromModelRef,
+  isModelCached as checkModelCached,
+  type ModelCacheStatus,
+} from '../lib/modelCache';
 import { apiRoutes } from '../lib/routes';
 import type { Model, SearchResult } from '../types/ui';
 
+const PREFETCH_POLL_MS = 3000;
+const PREFETCH_POLL_MAX_MS = 60_000;
+
+function filterSearchResults(results: SearchResult[], models: Model[]): SearchResult[] {
+  const knownRepos = new Set<string>();
+  for (const model of models) {
+    const repo = hfRepoFromModelRef(model.model);
+    if (repo) knownRepos.add(repo);
+  }
+  return results.filter((item) => {
+    const repo = hfRepoFromModelRef(item.model);
+    return !repo || !knownRepos.has(repo);
+  });
+}
+
+function usePrefetchAfterAdd() {
+  const { refreshModels, isModelCached } = useModels();
+  const [prefetching, setPrefetching] = useState<Set<string>>(() => new Set());
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollStartedRef = useRef(0);
+
+  const clearPrefetchPoll = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    pollStartedRef.current = 0;
+  }, []);
+
+  useEffect(() => () => clearPrefetchPoll(), [clearPrefetchPoll]);
+
+  const prefetchAfterAdd = useCallback(
+    (modelRef: string) => {
+      setPrefetching((prev) => new Set(prev).add(modelRef));
+      clearPrefetchPoll();
+      pollStartedRef.current = Date.now();
+
+      const tick = async () => {
+        try {
+          const payload = await refreshModels();
+          if (checkModelCached(modelRef, payload.cache ?? [])) {
+            setPrefetching((prev) => {
+              const next = new Set(prev);
+              next.delete(modelRef);
+              return next;
+            });
+            clearPrefetchPoll();
+          } else if (
+            Date.now() - pollStartedRef.current >= PREFETCH_POLL_MAX_MS
+          ) {
+            setPrefetching((prev) => {
+              const next = new Set(prev);
+              next.delete(modelRef);
+              return next;
+            });
+            clearPrefetchPoll();
+          }
+        } catch {
+          // keep polling until timeout
+        }
+      };
+
+      void tick();
+      pollTimerRef.current = setInterval(() => {
+        void tick();
+      }, PREFETCH_POLL_MS);
+    },
+    [refreshModels, clearPrefetchPoll]
+  );
+
+  const getModelStatus = useCallback(
+    (modelRef: string): ModelCacheStatus => {
+      if (prefetching.has(modelRef)) return 'prefetching';
+      if (isModelCached(modelRef)) return 'ready';
+      return 'not_cached';
+    },
+    [prefetching, isModelCached]
+  );
+
+  return { prefetchAfterAdd, getModelStatus };
+}
+
 export function ModelsPage() {
-  const [models, setModels] = useState<Model[]>([]);
+  const { models, loading, refreshModels } = useModels();
+  const { prefetchAfterAdd, getModelStatus } = usePrefetchAfterAdd();
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -21,24 +109,6 @@ export function ModelsPage() {
   const [localQuantization, setLocalQuantization] = useState('');
   const [localFile, setLocalFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-
-  const loadModels = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const payload = await getJson<{ models: Model[] }>(apiRoutes.uiModels);
-      setModels(payload.models);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load models');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadModels();
-  }, []);
 
   const canUseLocalFile = useMemo(
     () => localFile && localFile.name.endsWith('.gguf'),
@@ -53,9 +123,10 @@ export function ModelsPage() {
     }
     try {
       setSearching(true);
+      setError(null);
       const url = `${apiRoutes.uiModelsSearch}?q=${encodeURIComponent(query.trim())}`;
       const payload = await getJson<{ results: SearchResult[] }>(url);
-      setSearchResults(payload.results);
+      setSearchResults(filterSearchResults(payload.results, models));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
@@ -65,8 +136,11 @@ export function ModelsPage() {
 
   const addHfModel = async (model: string) => {
     try {
+      setError(null);
       await postJson(apiRoutes.uiModelsHF, { model });
-      await loadModels();
+      setSearchResults((prev) => prev.filter((item) => item.model !== model));
+      await refreshModels();
+      prefetchAfterAdd(model);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add model');
     }
@@ -92,7 +166,7 @@ export function ModelsPage() {
       setLocalName('');
       setLocalParameters('');
       setLocalQuantization('');
-      await loadModels();
+      await refreshModels();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -128,7 +202,6 @@ export function ModelsPage() {
         }
       />
 
-      {/* Search */}
       <form className="flex gap-3 items-stretch flex-wrap mb-6" onSubmit={onSearch}>
         <input
           className="flex-1 min-w-50 px-3 py-2 text-sm bg-(--bg-surface) border border-(--border) rounded-md text-(--text-primary) placeholder:text-(--text-muted) outline-none focus:border-(--border-focus) transition-colors"
@@ -151,7 +224,7 @@ export function ModelsPage() {
       )}
 
       <ModelSearchResultsTable results={searchResults} onAdd={addHfModel} />
-      <InstalledModelsTable models={models} loading={loading} />
+      <InstalledModelsTable getModelStatus={getModelStatus} />
 
       <LocalModelModal
         open={dialogOpen}

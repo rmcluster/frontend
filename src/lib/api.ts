@@ -1,6 +1,7 @@
 import type {
   ChatEventRequest,
   ChatSession,
+  LoadingStatus,
   ParallelismTarget,
   StorageChunkSize,
 } from '../types/ui';
@@ -81,8 +82,9 @@ export async function appendChatEvent(
   await postJson(chatEventsUrl(chatId), event);
 }
 
-export async function getLoadingStatus(): Promise<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }> {
-  return getJson<{ model: string; phase: string; progress: number; layers_on_gpu: number; node_count: number }>('/api/ui/loading-status');
+export async function getLoadingStatus(model?: string): Promise<LoadingStatus> {
+  const query = model ? `?model=${encodeURIComponent(model)}` : '';
+  return getJson<LoadingStatus>(`/api/ui/loading-status${query}`);
 }
 
 export async function getParallelismTarget(): Promise<ParallelismTarget> {

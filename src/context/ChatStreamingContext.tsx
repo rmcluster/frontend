@@ -38,7 +38,6 @@ export type StartStreamParams = {
 
 type ChatStreamingContextValue = {
   streams: Record<string, StreamEntry>;
-  nodeCount: number;
   toasts: StreamToast[];
   startStream: (params: StartStreamParams) => void;
   stopStream: (convId: string) => void;
@@ -50,7 +49,6 @@ const ChatStreamingContext = createContext<ChatStreamingContextValue | null>(nul
 export function ChatStreamingProvider({ children }: { children: ReactNode }) {
   const { appendMessage, updateLastMessage, activeId } = useConversations();
   const [streams, setStreams] = useState<Record<string, StreamEntry>>({});
-  const [nodeCount, setNodeCount] = useState(0);
   const [toasts, setToasts] = useState<StreamToast[]>([]);
   const abortRefs = useRef<Record<string, AbortController>>({});
   // Ref so async stream callbacks always see the current activeId without stale closure
@@ -61,16 +59,6 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
       setToasts((prev) => prev.filter((t) => t.convId !== activeId));
     }
   }, [activeId]);
-
-  // Always-on slow poll for node count
-  useEffect(() => {
-    const fetch = () => {
-      void getLoadingStatus().then((s) => setNodeCount(s.node_count)).catch(() => undefined);
-    };
-    fetch();
-    const id = setInterval(fetch, 5000);
-    return () => clearInterval(id);
-  }, []);
 
   const patch = useCallback((convId: string, update: Partial<StreamEntry>) => {
     setStreams((prev) => ({
@@ -120,7 +108,7 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
       // Poll loading phase until first token arrives
       const phaseInterval = setInterval(() => {
         if (assistantContent !== '') { clearInterval(phaseInterval); return; }
-        void getLoadingStatus().then((s) => {
+        void getLoadingStatus(model).then((s) => {
           if (assistantContent === '') {
             patch(convId, { loadingPhase: s.phase, loadingProgress: s.progress, layersOnGpu: s.layers_on_gpu });
           }
@@ -194,7 +182,7 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
   }, [appendMessage, updateLastMessage, patch]);
 
   return (
-    <ChatStreamingContext.Provider value={{ streams, nodeCount, toasts, startStream, stopStream, dismissToast }}>
+    <ChatStreamingContext.Provider value={{ streams, toasts, startStream, stopStream, dismissToast }}>
       {children}
     </ChatStreamingContext.Provider>
   );

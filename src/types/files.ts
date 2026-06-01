@@ -1,3 +1,7 @@
+export interface FileDevice {
+  displayName: string;
+}
+
 export interface DavEntry {
   name: string;
   path: string;
@@ -5,6 +9,7 @@ export interface DavEntry {
   size: number | null;
   lastModified: string | null;
   contentType: string | null;
+  devices: FileDevice[];
 }
 
 export type FileKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'unknown';

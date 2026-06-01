@@ -1,5 +1,6 @@
 import type {
   ChatEventRequest,
+  ChatMessage,
   ChatSession,
   ParallelismTarget,
   StorageChunkSize,
@@ -104,7 +105,6 @@ export async function setStorageChunkSize(chunkSizeBytes: number): Promise<Stora
     chunk_size_bytes: chunkSizeBytes,
   });
 }
-
 
 export async function* streamChat(
   messages: ChatMessage[],

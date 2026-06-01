@@ -185,6 +185,11 @@ export function FileList({
                   Modified {sortKey === 'modified' ? (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />) : <ArrowUpDown size={10} className="opacity-30" />}
                 </span>
               </th>
+              <th className={`${thBase} text-right w-56 hidden lg:table-cell`}>
+                <span className="inline-flex items-center justify-end gap-1">
+                  Devices
+                </span>
+              </th>
               <th className="w-10 border-b border-(--border)">
                 <span className="sr-only">Actions</span>
               </th>

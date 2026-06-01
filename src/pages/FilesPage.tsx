@@ -249,6 +249,7 @@ export function FilesPage() {
       size: 0,
       lastModified: new Date().toISOString(),
       contentType: null,
+      devices: [],
     };
     openFile(entry);
   }

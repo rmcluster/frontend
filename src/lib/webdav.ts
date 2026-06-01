@@ -2,6 +2,8 @@ import { DAV_BASE } from './routes';
 import type { DavEntry } from '../types/files';
 export type { DavEntry } from '../types/files';
 
+const RMCLUSTER_NS = 'urn:rmcluster:webdav';
+
 function parsePropfind(xml: string, requestedPath: string): DavEntry[] {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const responses = Array.from(doc.getElementsByTagNameNS('DAV:', 'response'));
@@ -36,6 +38,10 @@ function parsePropfind(xml: string, requestedPath: string): DavEntry[] {
       'DAV:',
       'getcontenttype'
     )[0];
+    const devicesProp = resp.getElementsByTagNameNS(RMCLUSTER_NS, 'devices')[0];
+    const deviceNodes = devicesProp
+      ? Array.from(devicesProp.getElementsByTagNameNS(RMCLUSTER_NS, 'device'))
+      : [];
 
     const rawName = href.replace(/\/$/, '').split('/').pop() ?? href;
 
@@ -55,6 +61,10 @@ function parsePropfind(xml: string, requestedPath: string): DavEntry[] {
         : null,
       lastModified: getlastmodified?.textContent?.trim() ?? null,
       contentType: getcontenttype?.textContent?.trim() ?? null,
+      devices: deviceNodes
+        .map((deviceNode) => deviceNode.textContent?.trim() ?? '')
+        .filter((name) => name.length > 0)
+        .map((displayName) => ({ displayName })),
     });
   }
 

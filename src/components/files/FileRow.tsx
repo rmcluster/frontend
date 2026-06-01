@@ -6,6 +6,7 @@ import { FileEntryIcon } from './FileEntryIcon';
 import { EntryActions } from './EntryActions';
 import { Check, X } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { DeviceListCell } from './DeviceListCell';
 
 export type FileRowProps = {
   entry: DavEntry;
@@ -253,6 +254,9 @@ export function FileRow({
           const d = new Date(raw);
           return isNaN(d.getTime()) ? raw : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
         })()}
+      </td>
+      <td className="px-4 py-3 text-right font-(--font-mono) text-[0.8125rem] text-(--text-muted) hidden lg:table-cell max-w-56 w-56">
+        <DeviceListCell isDirectory={entry.isDirectory} devices={entry.devices} />
       </td>
       <td className="px-2 py-3">
         <EntryActions

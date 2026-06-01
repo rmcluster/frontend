@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Square, Send } from 'lucide-react';
+import type { LoadedDevice } from '../../types/ui';
 
 const MIN_COMPOSER_HEIGHT = 40;
 
@@ -10,9 +11,30 @@ type ChatComposerProps = {
   disabled: boolean;
   streaming: boolean;
   nodeCount?: number;
+  loadedDevices?: LoadedDevice[];
 };
 
-export function ChatComposer({ onSend, onStop, disabled, streaming, nodeCount = 0 }: ChatComposerProps) {
+function footerText(nodeCount: number, loadedDevices: LoadedDevice[]): string {
+  if (loadedDevices && loadedDevices.length > 0) {
+    const names = loadedDevices
+      .map((device) => device.nickname?.trim() || device.hardware_model.trim())
+      .filter(Boolean)
+      .join(', ');
+    if (names) {
+      return `using ${names}`;
+    }
+  }
+  return nodeCount === 1 ? '1 node' : `${nodeCount} nodes`;
+}
+
+export function ChatComposer({
+  onSend,
+  onStop,
+  disabled,
+  streaming,
+  nodeCount = 0,
+  loadedDevices = [],
+}: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const submit = () => {
@@ -73,7 +95,7 @@ export function ChatComposer({ onSend, onStop, disabled, streaming, nodeCount = 
         )}
       </div>
       <p className="text-center text-[0.7rem] text-(--text-muted) mt-2 font-(--font-mono)">
-        Ctrl+Enter to send · {nodeCount === 1 ? '1 node' : `${nodeCount} nodes`}
+        Ctrl+Enter to send · {footerText(nodeCount, loadedDevices)}
       </p>
     </div>
   );

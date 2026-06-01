@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useConversations } from '../context/ConversationContext';
-import { startChatSession } from '../lib/api';
+import { getLoadingStatus, startChatSession } from '../lib/api';
 import { useModels } from '../context/ModelsContext';
 import { buildChatPath } from '../lib/routes';
 import { useChatStreaming } from '../context/ChatStreamingContext';
 import { ChatComposer } from '../components/chat/ChatComposer';
 import { ChatMessages } from '../components/chat/ChatMessages';
-import type { ChatMessage } from '../types/ui';
+import type { ChatMessage, LoadedDevice } from '../types/ui';
 
 const emptyStream = {
   streaming: false,
@@ -30,8 +30,10 @@ export function ChatPage() {
     createConversation,
   } = useConversations();
 
-  const { streams, nodeCount, startStream, stopStream } = useChatStreaming();
+  const { streams, startStream, stopStream } = useChatStreaming();
   const { models } = useModels();
+  const [nodeCount, setNodeCount] = useState(0);
+  const [loadedDevices, setLoadedDevices] = useState<LoadedDevice[]>([]);
 
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem('rmcluster_thinking') !== 'false'; }
@@ -62,6 +64,27 @@ export function ChatPage() {
     (activeId ? streams[activeId] : null) ?? emptyStream;
 
   const thinkingSupported = models.find((m) => m.model === model)?.supports_thinking ?? false;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStatus = () => {
+      void getLoadingStatus(model).then((status) => {
+        if (cancelled) return;
+        setNodeCount(status.node_count);
+        setLoadedDevices(status.loaded_devices);
+      }).catch(() => undefined);
+    };
+
+    setLoadedDevices([]);
+    loadStatus();
+    const timer = window.setInterval(loadStatus, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [model]);
 
   const toggleThinking = () => {
     setThinkingEnabled((prev) => {
@@ -143,6 +166,7 @@ export function ChatPage() {
         disabled={streaming}
         streaming={streaming}
         nodeCount={nodeCount}
+        loadedDevices={loadedDevices}
       />
     </div>
   );

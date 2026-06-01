@@ -98,6 +98,12 @@ export type ChatSessionDetail = ChatSession & {
   events: ChatEvent[];
 };
 
+export type LoadedDevice = {
+  id: string;
+  nickname?: string;
+  hardware_model: string;
+};
+
 export type LoadingStatus = {
   model: string;
   phase: string;
@@ -105,6 +111,7 @@ export type LoadingStatus = {
   layers_on_gpu: number;
   layers_offloaded: number;
   node_count: number;
+  loaded_devices: LoadedDevice[];
 };
 
 export type ParallelismTarget = {
@@ -114,4 +121,3 @@ export type ParallelismTarget = {
 export type StorageChunkSize = {
   chunk_size_bytes: number;
 };
-

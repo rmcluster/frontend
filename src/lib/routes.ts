@@ -25,6 +25,10 @@ export function chatCompletionsUrl(): string {
   return '/v1/chat/completions';
 }
 
+export function customChatCompletionsUrl(): string {
+  return '/v1/custom_chat/completions';
+}
+
 export function chatEventsUrl(chatId: string): string {
   return `/api/ui/chats/${chatId}/events`;
 }

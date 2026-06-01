@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ChatMessage, Conversation } from '../types/ui';
+import type { ChatMessage, Conversation, LoadedDevice } from '../types/ui';
 
 const STORAGE_KEY = 'rmcluster_conversations';
 
@@ -28,6 +28,7 @@ type ConversationContextValue = {
   updateConversationModel: (id: string, model: string) => void;
   deleteConversation: (id: string) => void;
   renameConversation: (id: string, title: string) => void;
+  setConversationDevices: (id: string, loadedDevices: LoadedDevice[]) => void;
 };
 
 const ConversationContext = createContext<ConversationContextValue | null>(null);
@@ -103,6 +104,14 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     update((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)));
   }, [update]);
 
+  const setConversationDevices = useCallback((id: string, loadedDevices: LoadedDevice[]) => {
+    update((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, loaded_devices: loadedDevices, updated_at: new Date().toISOString() } : c
+      )
+    );
+  }, [update]);
+
   return (
     <ConversationContext.Provider
       value={{
@@ -115,6 +124,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
         updateConversationModel,
         deleteConversation,
         renameConversation,
+        setConversationDevices,
       }}
     >
       {children}

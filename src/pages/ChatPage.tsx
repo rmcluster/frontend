@@ -7,7 +7,7 @@ import { buildChatPath } from '../lib/routes';
 import { useChatStreaming } from '../context/ChatStreamingContext';
 import { ChatComposer } from '../components/chat/ChatComposer';
 import { ChatMessages } from '../components/chat/ChatMessages';
-import type { ChatMessage, LoadedDevice } from '../types/ui';
+import type { ChatMessage } from '../types/ui';
 
 const emptyStream = {
   streaming: false,
@@ -15,6 +15,8 @@ const emptyStream = {
   loadingPhase: '',
   loadingProgress: 0,
   layersOnGpu: 0,
+  nodeCount: 0,
+  loadedDevices: [],
 };
 
 export function ChatPage() {
@@ -32,8 +34,7 @@ export function ChatPage() {
 
   const { streams, startStream, stopStream } = useChatStreaming();
   const { models } = useModels();
-  const [nodeCount, setNodeCount] = useState(0);
-  const [loadedDevices, setLoadedDevices] = useState<LoadedDevice[]>([]);
+  const [clusterNodeCount, setClusterNodeCount] = useState(0);
 
   const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(() => {
     try { return localStorage.getItem('rmcluster_thinking') !== 'false'; }
@@ -60,31 +61,40 @@ export function ChatPage() {
   const messages = activeConv?.messages ?? [];
   const model = activeConv?.model ?? modelParam;
 
-  const { streaming, streamingContent, loadingPhase, loadingProgress, layersOnGpu } =
-    (activeId ? streams[activeId] : null) ?? emptyStream;
+  const {
+    streaming,
+    streamingContent,
+    loadingPhase,
+    loadingProgress,
+    layersOnGpu,
+    nodeCount,
+    loadedDevices,
+  } = (activeId ? streams[activeId] : null) ?? emptyStream;
 
   const thinkingSupported = models.find((m) => m.model === model)?.supports_thinking ?? false;
 
+  // Cluster-wide connected node count (stream only reports nodes used per inference).
   useEffect(() => {
     let cancelled = false;
-
-    const loadStatus = () => {
-      void getLoadingStatus(model).then((status) => {
-        if (cancelled) return;
-        setNodeCount(status.node_count);
-        setLoadedDevices(status.loaded_devices);
+    const refresh = () => {
+      void getLoadingStatus().then((status) => {
+        if (!cancelled) setClusterNodeCount(status.node_count);
       }).catch(() => undefined);
     };
-
-    setLoadedDevices([]);
-    loadStatus();
-    const timer = window.setInterval(loadStatus, 5000);
-
+    refresh();
+    const timer = window.setInterval(refresh, 5000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [model]);
+  }, []);
+
+  const sessionDevices = activeConv?.loaded_devices ?? [];
+  const footerDevices = loadedDevices.length > 0 ? loadedDevices : sessionDevices;
+  const footerNodeCount =
+    footerDevices.length > 0
+      ? (nodeCount > 0 ? nodeCount : footerDevices.length)
+      : (nodeCount > 0 ? nodeCount : clusterNodeCount);
 
   const toggleThinking = () => {
     setThinkingEnabled((prev) => {
@@ -165,8 +175,8 @@ export function ChatPage() {
         onStop={handleStop}
         disabled={streaming}
         streaming={streaming}
-        nodeCount={nodeCount}
-        loadedDevices={loadedDevices}
+        nodeCount={footerNodeCount}
+        loadedDevices={footerDevices}
       />
     </div>
   );

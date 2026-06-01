@@ -1,11 +1,37 @@
 import type {
   ChatEventRequest,
+  ChatMessage,
   ChatSession,
+  LoadedDevice,
   LoadingStatus,
   ParallelismTarget,
   StorageChunkSize,
 } from '../types/ui';
-import { chatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
+import { customChatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
+
+export type StreamNode = {
+  ip: string;
+  port: number;
+  storage_port: number;
+  max_size: number;
+  nickname?: string;
+  hardware_model: string;
+  battery: number;
+  temperature: number;
+};
+
+export type ChatStreamEvent =
+  | { type: 'nodes'; nodes: StreamNode[] }
+  | { type: 'status'; phase: string; percentage: number }
+  | { type: 'token'; token: string };
+
+export function streamNodesToLoadedDevices(nodes: StreamNode[]): LoadedDevice[] {
+  return nodes.map((node) => ({
+    id: `${node.ip}:${node.port}`,
+    nickname: node.nickname,
+    hardware_model: node.hardware_model,
+  }));
+}
 
 async function readErrorMessage(response: Response): Promise<string> {
   const text = await response.text();
@@ -108,15 +134,40 @@ export async function setStorageChunkSize(chunkSizeBytes: number): Promise<Stora
 }
 
 
+function parseChatStreamEvent(raw: unknown): ChatStreamEvent | null {
+  if (!raw || typeof raw !== 'object' || !('type' in raw)) return null;
+  const event = raw as { type: string };
+  switch (event.type) {
+    case 'nodes': {
+      const nodes = (event as { nodes?: unknown }).nodes;
+      if (!Array.isArray(nodes)) return null;
+      return { type: 'nodes', nodes: nodes as StreamNode[] };
+    }
+    case 'status': {
+      const phase = (event as { phase?: unknown }).phase;
+      const percentage = (event as { percentage?: unknown }).percentage;
+      if (typeof phase !== 'string' || typeof percentage !== 'number') return null;
+      return { type: 'status', phase, percentage };
+    }
+    case 'token': {
+      const token = (event as { token?: unknown }).token;
+      if (typeof token !== 'string' || token === '') return null;
+      return { type: 'token', token };
+    }
+    default:
+      return null;
+  }
+}
+
 export async function* streamChat(
   messages: ChatMessage[],
   model: string,
   signal: AbortSignal
-): AsyncGenerator<string> {
-  const res = await fetch(chatCompletionsUrl(), {
+): AsyncGenerator<ChatStreamEvent> {
+  const res = await fetch(customChatCompletionsUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify({ model, messages }),
     signal,
   });
 
@@ -136,18 +187,24 @@ export async function* streamChat(
     buf = lines.pop() ?? '';
 
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') return;
+      const trimmed = line.trim();
+      if (!trimmed) continue;
       try {
-        const parsed = JSON.parse(data) as {
-          choices: Array<{ delta: { content?: string } }>;
-        };
-        const delta = parsed.choices[0]?.delta?.content;
-        if (delta) yield delta;
+        const event = parseChatStreamEvent(JSON.parse(trimmed));
+        if (event) yield event;
       } catch {
-        // skip malformed SSE line
+        // skip malformed JSONL line
       }
+    }
+  }
+
+  const tail = buf.trim();
+  if (tail) {
+    try {
+      const event = parseChatStreamEvent(JSON.parse(tail));
+      if (event) yield event;
+    } catch {
+      // ignore trailing partial line
     }
   }
 }

@@ -1,17 +1,16 @@
 import { Link } from 'react-router-dom';
 import { SkeletonRow } from '../SkeletonBlock';
-import type { Model } from '../../types/ui';
+import { useModels } from '../../context/ModelsContext';
+import { modelCacheStatusLabel, type ModelCacheStatus } from '../../lib/modelCache';
 import { buildChatPath } from '../../lib/routes';
 
 type InstalledModelsTableProps = {
-  models: Model[];
-  loading: boolean;
+  getModelStatus: (modelRef: string) => ModelCacheStatus;
 };
 
-export function InstalledModelsTable({
-  models,
-  loading,
-}: InstalledModelsTableProps) {
+export function InstalledModelsTable({ getModelStatus }: InstalledModelsTableProps) {
+  const { models, loading } = useModels();
+
   return (
     <div>
       <div className="px-4 pt-6 pb-2 border-t border-(--border) text-[0.7rem] font-semibold tracking-widest uppercase text-(--text-muted)">
@@ -21,7 +20,16 @@ export function InstalledModelsTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              {['Name', 'Parameters', 'Architecture', 'Quantization', 'Thinking', 'Source', 'Actions'].map((h, i) => (
+              {[
+                'Name',
+                'Parameters',
+                'Architecture',
+                'Quantization',
+                'Thinking',
+                'Source',
+                'Status',
+                'Actions',
+              ].map((h, i) => (
                 <th
                   key={h}
                   className="font-[var(--font-mono)] text-[0.72rem] uppercase tracking-[0.08em] text-[var(--text-muted)] px-4 py-3 border-b border-[var(--border)] text-left whitespace-nowrap"
@@ -35,11 +43,11 @@ export function InstalledModelsTable({
           <tbody>
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <SkeletonRow key={i} cols={6} />
+                <SkeletonRow key={i} cols={8} />
               ))
             ) : models.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-4 text-[var(--text-primary)] align-middle">
+                <td colSpan={8} className="px-4 py-4 text-[var(--text-primary)] align-middle">
                   <div className="flex flex-col items-center justify-center text-center gap-3 py-10">
                     <div className="w-12 h-12 rounded-[var(--radius-xl)] bg-[var(--accent-dim)] grid place-items-center text-[var(--accent)]">
                       <svg
@@ -89,6 +97,9 @@ export function InstalledModelsTable({
                   <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[0.8125rem] text-[var(--text-secondary)] transition-colors">
                     {model.source}
                   </td>
+                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[0.8125rem] text-[var(--text-secondary)] transition-colors">
+                    {modelCacheStatusLabel(getModelStatus(model.model))}
+                  </td>
                   <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle transition-colors">
                     <div className="flex gap-1.5 items-center">
                       <Link
@@ -116,4 +127,3 @@ export function InstalledModelsTable({
     </div>
   );
 }
-

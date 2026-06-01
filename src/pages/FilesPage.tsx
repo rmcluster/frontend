@@ -60,8 +60,8 @@ export function FilesPage() {
 
   useEffect(() => {
     void getJson<ConnectInfo>(apiRoutes.uiConnectInfo)
-      .then((info) => setDavUrl(`http://${info.host}:${info.port}${DAV_BASE}`))
-      .catch(() => setDavUrl(`${window.location.origin}${DAV_BASE}`));
+      .then((info) => setDavUrl(`dav://${info.host}:${info.port}${DAV_BASE}`))
+      .catch(() => setDavUrl(`${window.location.origin.replace(/^https?:/, 'dav:')}${DAV_BASE}`));
   }, []);
 
   function handleCopyDavUrl() {
@@ -107,11 +107,11 @@ export function FilesPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!filePath) setViewingEntry(null);
-     
+
     setRenamingFile(false);
-     
+
     setRenameValue('');
-     
+
     setExtWarnNewName(null);
   }, [filePath]);
 

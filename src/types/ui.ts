@@ -49,6 +49,12 @@ export type Device = {
   owner?: string;
 };
 
+export type LoadedDevice = {
+  id: string;
+  nickname?: string;
+  hardware_model: string;
+};
+
 export type Conversation = {
   id: string;
   title: string;
@@ -56,6 +62,7 @@ export type Conversation = {
   messages: ChatMessage[];
   created_at: string;
   updated_at: string;
+  loaded_devices?: LoadedDevice[];
 };
 
 export type ConnectInfo = {
@@ -96,12 +103,6 @@ export type ChatEvent = ChatEventRequest & {
 
 export type ChatSessionDetail = ChatSession & {
   events: ChatEvent[];
-};
-
-export type LoadedDevice = {
-  id: string;
-  nickname?: string;
-  hardware_model: string;
 };
 
 export type LoadingStatus = {

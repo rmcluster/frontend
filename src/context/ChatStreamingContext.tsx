@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { streamChat, appendChatEvent, getLoadingStatus } from '../lib/api';
+import { streamChat, streamNodesToLoadedDevices, appendChatEvent } from '../lib/api';
 import { useConversations } from './ConversationContext';
-import type { ChatMessage } from '../types/ui';
+import type { ChatMessage, LoadedDevice } from '../types/ui';
 
 export type StreamEntry = {
   streaming: boolean;
@@ -10,6 +10,8 @@ export type StreamEntry = {
   loadingPhase: string;
   loadingProgress: number;
   layersOnGpu: number;
+  nodeCount: number;
+  loadedDevices: LoadedDevice[];
 };
 
 export type StreamToast = {
@@ -25,6 +27,8 @@ const emptyEntry: StreamEntry = {
   loadingPhase: '',
   loadingProgress: 0,
   layersOnGpu: 0,
+  nodeCount: 0,
+  loadedDevices: [],
 };
 
 export type StartStreamParams = {
@@ -47,7 +51,7 @@ type ChatStreamingContextValue = {
 const ChatStreamingContext = createContext<ChatStreamingContextValue | null>(null);
 
 export function ChatStreamingProvider({ children }: { children: ReactNode }) {
-  const { appendMessage, updateLastMessage, activeId } = useConversations();
+  const { appendMessage, updateLastMessage, setConversationDevices, activeId } = useConversations();
   const [streams, setStreams] = useState<Record<string, StreamEntry>>({});
   const [toasts, setToasts] = useState<StreamToast[]>([]);
   const abortRefs = useRef<Record<string, AbortController>>({});
@@ -92,7 +96,12 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString(),
     }).catch(() => undefined);
 
-    patch(convId, { streaming: true, streamingContent: '', loadingPhase: '', loadingProgress: 0 });
+    patch(convId, {
+      streaming: true,
+      streamingContent: '',
+      loadingPhase: '',
+      loadingProgress: 0,
+    });
 
     const history: ChatMessage[] = [
       ...(!thinkingEnabled ? [{ role: 'system' as const, content: '/no_think' }] : []),
@@ -105,26 +114,32 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
       let firstTokenTime: number | null = null;
       let tokenCount = 0;
 
-      // Poll loading phase until first token arrives
-      const phaseInterval = setInterval(() => {
-        if (assistantContent !== '') { clearInterval(phaseInterval); return; }
-        void getLoadingStatus(model).then((s) => {
-          if (assistantContent === '') {
-            patch(convId, { loadingPhase: s.phase, loadingProgress: s.progress, layersOnGpu: s.layers_on_gpu });
-          }
-        }).catch(() => undefined);
-      }, 1200);
-
       const attemptStream = async (isRetry: boolean): Promise<boolean> => {
         if (isRetry) {
           await new Promise((r) => setTimeout(r, 2000));
           if (controller.signal.aborted) return false;
         }
-        for await (const token of streamChat(history, model, controller.signal)) {
-          if (firstTokenTime === null) firstTokenTime = Date.now();
-          tokenCount += 1;
-          assistantContent += token;
-          patch(convId, { streamingContent: assistantContent, loadingPhase: '' });
+        for await (const event of streamChat(history, model, controller.signal)) {
+          if (event.type === 'nodes') {
+            const loadedDevices = streamNodesToLoadedDevices(event.nodes);
+            setConversationDevices(convId, loadedDevices);
+            patch(convId, {
+              nodeCount: event.nodes.length,
+              loadedDevices,
+            });
+          } else if (event.type === 'status') {
+            if (assistantContent === '' && event.phase !== 'finished') {
+              patch(convId, {
+                loadingPhase: event.phase,
+                loadingProgress: event.percentage,
+              });
+            }
+          } else if (event.type === 'token') {
+            if (firstTokenTime === null) firstTokenTime = Date.now();
+            tokenCount += 1;
+            assistantContent += event.token;
+            patch(convId, { streamingContent: assistantContent, loadingPhase: '' });
+          }
         }
         return true;
       };
@@ -174,12 +189,11 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
           }
         }
       } finally {
-        clearInterval(phaseInterval);
         patch(convId, { streaming: false, streamingContent: '', loadingPhase: '' });
         delete abortRefs.current[convId];
       }
     })();
-  }, [appendMessage, updateLastMessage, patch]);
+  }, [appendMessage, updateLastMessage, setConversationDevices, patch]);
 
   return (
     <ChatStreamingContext.Provider value={{ streams, toasts, startStream, stopStream, dismissToast }}>

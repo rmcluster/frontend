@@ -15,7 +15,7 @@ import { apiRoutes } from '../lib/routes';
 import type { Model, SearchResult } from '../types/ui';
 
 const PREFETCH_POLL_MS = 3000;
-const PREFETCH_POLL_MAX_MS = 60_000;
+const PREFETCH_POLL_MAX_MS = 10 * 60_000;
 
 function filterSearchResults(results: SearchResult[], models: Model[]): SearchResult[] {
   const knownRepos = new Set<string>();
@@ -29,27 +29,41 @@ function filterSearchResults(results: SearchResult[], models: Model[]): SearchRe
   });
 }
 
-function usePrefetchAfterAdd() {
+function usePrefetchAfterAdd(options?: {
+  onPrefetchTimeout?: (modelRef: string) => void;
+}) {
   const { refreshModels, isModelCached } = useModels();
   const [prefetching, setPrefetching] = useState<Set<string>>(() => new Set());
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollStartedRef = useRef(0);
+  const pollTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(
+    new Map()
+  );
+  const pollStartedRef = useRef<Map<string, number>>(new Map());
 
-  const clearPrefetchPoll = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
+  const clearPrefetchPoll = useCallback((modelRef: string) => {
+    const timer = pollTimersRef.current.get(modelRef);
+    if (timer) {
+      clearInterval(timer);
+      pollTimersRef.current.delete(modelRef);
     }
-    pollStartedRef.current = 0;
+    pollStartedRef.current.delete(modelRef);
   }, []);
 
-  useEffect(() => () => clearPrefetchPoll(), [clearPrefetchPoll]);
+  useEffect(
+    () => () => {
+      for (const timer of pollTimersRef.current.values()) {
+        clearInterval(timer);
+      }
+      pollTimersRef.current.clear();
+      pollStartedRef.current.clear();
+    },
+    []
+  );
 
   const prefetchAfterAdd = useCallback(
     (modelRef: string) => {
       setPrefetching((prev) => new Set(prev).add(modelRef));
-      clearPrefetchPoll();
-      pollStartedRef.current = Date.now();
+      clearPrefetchPoll(modelRef);
+      pollStartedRef.current.set(modelRef, Date.now());
 
       const tick = async () => {
         try {
@@ -60,16 +74,18 @@ function usePrefetchAfterAdd() {
               next.delete(modelRef);
               return next;
             });
-            clearPrefetchPoll();
+            clearPrefetchPoll(modelRef);
           } else if (
-            Date.now() - pollStartedRef.current >= PREFETCH_POLL_MAX_MS
+            Date.now() - (pollStartedRef.current.get(modelRef) ?? 0) >=
+            PREFETCH_POLL_MAX_MS
           ) {
             setPrefetching((prev) => {
               const next = new Set(prev);
               next.delete(modelRef);
               return next;
             });
-            clearPrefetchPoll();
+            clearPrefetchPoll(modelRef);
+            options?.onPrefetchTimeout?.(modelRef);
           }
         } catch {
           // keep polling until timeout
@@ -77,11 +93,14 @@ function usePrefetchAfterAdd() {
       };
 
       void tick();
-      pollTimerRef.current = setInterval(() => {
-        void tick();
-      }, PREFETCH_POLL_MS);
+      pollTimersRef.current.set(
+        modelRef,
+        setInterval(() => {
+          void tick();
+        }, PREFETCH_POLL_MS)
+      );
     },
-    [refreshModels, clearPrefetchPoll]
+    [refreshModels, clearPrefetchPoll, options]
   );
 
   const getModelStatus = useCallback(
@@ -98,7 +117,6 @@ function usePrefetchAfterAdd() {
 
 export function ModelsPage() {
   const { models, loading, refreshModels } = useModels();
-  const { prefetchAfterAdd, getModelStatus } = usePrefetchAfterAdd();
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -109,6 +127,11 @@ export function ModelsPage() {
   const [localQuantization, setLocalQuantization] = useState('');
   const [localFile, setLocalFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const { prefetchAfterAdd, getModelStatus } = usePrefetchAfterAdd({
+    onPrefetchTimeout: (modelRef) => {
+      setError(`Download failed for ${modelRef}. Try again later.`);
+    },
+  });
 
   const canUseLocalFile = useMemo(
     () => localFile && localFile.name.endsWith('.gguf'),
@@ -143,6 +166,17 @@ export function ModelsPage() {
       prefetchAfterAdd(model);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add model');
+    }
+  };
+
+  const prefetchInstalledModel = async (model: string) => {
+    try {
+      setError(null);
+      await postJson(apiRoutes.uiModelsHF, { model });
+      await refreshModels();
+      prefetchAfterAdd(model);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to download model');
     }
   };
 
@@ -224,7 +258,10 @@ export function ModelsPage() {
       )}
 
       <ModelSearchResultsTable results={searchResults} onAdd={addHfModel} />
-      <InstalledModelsTable getModelStatus={getModelStatus} />
+      <InstalledModelsTable
+        getModelStatus={getModelStatus}
+        onPrefetch={prefetchInstalledModel}
+      />
 
       <LocalModelModal
         open={dialogOpen}

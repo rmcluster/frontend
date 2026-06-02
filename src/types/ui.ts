@@ -120,10 +120,25 @@ export type LoadingStatus = {
   loaded_devices: LoadedDevice[];
 };
 
-export type ParallelismTarget = {
-  parallelism_target: number;
+export type TunableKind = 'int' | 'float';
+
+export type TunableSpec = {
+  key: string;
+  label: string;
+  description?: string;
+  kind: TunableKind;
+  unit?: string;
+  min?: number;
+  max?: number;
 };
 
-export type StorageChunkSize = {
-  chunk_size_bytes: number;
+export type TunablesSection = {
+  key: string;
+  label: string;
+  specs: TunableSpec[];
+  values: Record<string, number>;
+};
+
+export type TunablesResponse = {
+  sections: TunablesSection[];
 };

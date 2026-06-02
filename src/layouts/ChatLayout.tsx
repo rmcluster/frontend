@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { ChatSidebar } from '../components/chat/ChatSidebar';
-import { SettingsModal } from '../components/settings/SettingsModal';
+import { TunablesModal } from '../components/tunables/TunablesModal';
 import { ModelsProvider } from '../context/ModelsContext';
 
 export function ChatLayout() {
@@ -18,7 +18,7 @@ export function ChatLayout() {
             <Outlet />
           </div>
         </div>
-        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <TunablesModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       </div>
     </ModelsProvider>
   );

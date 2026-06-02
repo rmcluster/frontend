@@ -6,9 +6,13 @@ import { buildChatPath } from '../../lib/routes';
 
 type InstalledModelsTableProps = {
   getModelStatus: (modelRef: string) => ModelCacheStatus;
+  onPrefetch: (modelRef: string) => void;
 };
 
-export function InstalledModelsTable({ getModelStatus }: InstalledModelsTableProps) {
+export function InstalledModelsTable({
+  getModelStatus,
+  onPrefetch,
+}: InstalledModelsTableProps) {
   const { models, loading } = useModels();
 
   return (
@@ -72,54 +76,84 @@ export function InstalledModelsTable({ getModelStatus }: InstalledModelsTablePro
                 </td>
               </tr>
             ) : (
-              models.map((model) => (
-                <tr key={model.model} className="hover:[&>td]:bg-[var(--bg-elevated)]">
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[var(--text-primary)] transition-colors">
-                    <div className="font-medium">{model.display_name}</div>
-                    <div className="text-xs text-[var(--text-muted)] font-[var(--font-mono)] mt-0.5">{model.model}</div>
-                  </td>
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
-                    {model.parameters || '—'}
-                  </td>
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
-                    {model.architecture || '—'}
-                  </td>
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
-                    {model.quantization || '—'}
-                  </td>
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-center transition-colors">
-                    {model.supports_thinking && (
-                      <span className="inline-flex items-center text-[0.7rem] font-semibold tracking-wide px-1.5 py-0.5 rounded-full border text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border-[color-mix(in_srgb,var(--accent)_30%,transparent)]">
-                        Think
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[0.8125rem] text-[var(--text-secondary)] transition-colors">
-                    {model.source}
-                  </td>
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[0.8125rem] text-[var(--text-secondary)] transition-colors">
-                    {modelCacheStatusLabel(getModelStatus(model.model))}
-                  </td>
-                  <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle transition-colors">
-                    <div className="flex gap-1.5 items-center">
-                      <Link
-                        to={buildChatPath(model.model)}
-                        className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none"
-                      >
-                        Chat
-                      </Link>
-                      <a
-                        href={model.link_href}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
-                      >
-                        {model.link_label}
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              models.map((model) => {
+                const status = getModelStatus(model.model);
+
+                return (
+                  <tr key={model.model} className="hover:[&>td]:bg-[var(--bg-elevated)]">
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[var(--text-primary)] transition-colors">
+                      <div className="font-medium">{model.display_name}</div>
+                      <div className="text-xs text-[var(--text-muted)] font-[var(--font-mono)] mt-0.5">{model.model}</div>
+                    </td>
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
+                      {model.parameters || '—'}
+                    </td>
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
+                      {model.architecture || '—'}
+                    </td>
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle font-[var(--font-mono)] text-[0.8125rem] text-[var(--text-primary)] transition-colors">
+                      {model.quantization || '—'}
+                    </td>
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-center transition-colors">
+                      {model.supports_thinking && (
+                        <span className="inline-flex items-center text-[0.7rem] font-semibold tracking-wide px-1.5 py-0.5 rounded-full border text-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border-[color-mix(in_srgb,var(--accent)_30%,transparent)]">
+                          Think
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[0.8125rem] text-[var(--text-secondary)] transition-colors">
+                      {model.source}
+                    </td>
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle text-[0.8125rem] text-[var(--text-secondary)] transition-colors">
+                      <div className="inline-flex items-center gap-2">
+                        <span>{modelCacheStatusLabel(status)}</span>
+                        {status === 'not_cached' && (
+                          <button
+                            type="button"
+                            onClick={() => onPrefetch(model.model)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] cursor-pointer outline-none"
+                            title="Download model"
+                            aria-label={`Download ${model.display_name}`}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M12 3v12" />
+                              <path d="m7 10 5 5 5-5" />
+                              <path d="M5 21h14" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 border-b border-[var(--border-subtle)] align-middle transition-colors">
+                      <div className="flex gap-1.5 items-center">
+                        <Link
+                          to={buildChatPath(model.model)}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer border-0 outline-none"
+                        >
+                          Chat
+                        </Link>
+                        <a
+                          href={model.link_href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors cursor-pointer outline-none"
+                        >
+                          {model.link_label}
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

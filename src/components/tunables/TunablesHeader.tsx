@@ -5,17 +5,17 @@ import {
   DialogTitle,
 } from '../ui/Dialog';
 
-type SettingsDialogHeaderProps = {
+type TunablesHeaderProps = {
   onClose: () => void;
 };
 
-export function SettingsDialogHeader({ onClose }: SettingsDialogHeaderProps) {
+export function TunablesHeader({ onClose }: TunablesHeaderProps) {
   return (
     <DialogHeader>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Advanced config options.</DialogDescription>
+          <DialogTitle>Tunables</DialogTitle>
+          <DialogDescription>Runtime tuning controls.</DialogDescription>
         </div>
         <button
           type="button"

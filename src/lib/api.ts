@@ -4,8 +4,8 @@ import type {
   ChatSession,
   LoadedDevice,
   LoadingStatus,
-  ParallelismTarget,
-  StorageChunkSize,
+  TunablesResponse,
+  TunablesSection,
 } from '../types/ui';
 import { customChatCompletionsUrl, apiRoutes, chatEventsUrl } from './routes';
 
@@ -113,24 +113,15 @@ export async function getLoadingStatus(model?: string): Promise<LoadingStatus> {
   return getJson<LoadingStatus>(`/api/ui/loading-status${query}`);
 }
 
-export async function getParallelismTarget(): Promise<ParallelismTarget> {
-  return getJson<ParallelismTarget>(apiRoutes.uiParallelismTarget);
+export async function getTunables(): Promise<TunablesResponse> {
+  return getJson<TunablesResponse>(apiRoutes.uiTunables);
 }
 
-export async function setParallelismTarget(parallelismTarget: number): Promise<ParallelismTarget> {
-  return postJson<ParallelismTarget>(apiRoutes.uiParallelismTarget, {
-    parallelism_target: parallelismTarget,
-  });
-}
-
-export async function getStorageChunkSize(): Promise<StorageChunkSize> {
-  return getJson<StorageChunkSize>(apiRoutes.uiStorageChunkSize);
-}
-
-export async function setStorageChunkSize(chunkSizeBytes: number): Promise<StorageChunkSize> {
-  return postJson<StorageChunkSize>(apiRoutes.uiStorageChunkSize, {
-    chunk_size_bytes: chunkSizeBytes,
-  });
+export async function setTunables(
+  section: string,
+  values: Record<string, number>
+): Promise<TunablesSection> {
+  return postJson<TunablesSection>(apiRoutes.uiTunables, { section, values });
 }
 
 

@@ -22,7 +22,7 @@ export type StreamNode = {
 
 export type ChatStreamEvent =
   | { type: 'nodes'; nodes: StreamNode[] }
-  | { type: 'status'; phase: string; percentage: number }
+  | { type: 'status'; phase: string; percentage: number; layers_on_gpu?: number }
   | { type: 'token'; token: string };
 
 export function streamNodesToLoadedDevices(nodes: StreamNode[]): LoadedDevice[] {
@@ -110,7 +110,20 @@ export async function appendChatEvent(
 
 export async function getLoadingStatus(model?: string): Promise<LoadingStatus> {
   const query = model ? `?model=${encodeURIComponent(model)}` : '';
-  return getJson<LoadingStatus>(`/api/ui/loading-status${query}`);
+  const raw = await getJson<{
+    model?: string;
+    phase?: string;
+    progress?: number;
+    layers_on_rpc?: number;
+    node_count?: number;
+  }>(`/api/ui/loading-status${query}`);
+  return {
+    model: raw.model ?? '',
+    phase: raw.phase ?? '',
+    progress: raw.progress ?? 0,
+    layers_on_gpu: raw.layers_on_rpc ?? 0,
+    node_count: raw.node_count ?? 0,
+  };
 }
 
 export async function getTunables(): Promise<TunablesResponse> {
@@ -119,7 +132,7 @@ export async function getTunables(): Promise<TunablesResponse> {
 
 export async function setTunables(
   section: string,
-  values: Record<string, number>
+  values: Record<string, string | number>
 ): Promise<TunablesSection> {
   return postJson<TunablesSection>(apiRoutes.uiTunables, { section, values });
 }
@@ -137,8 +150,16 @@ function parseChatStreamEvent(raw: unknown): ChatStreamEvent | null {
     case 'status': {
       const phase = (event as { phase?: unknown }).phase;
       const percentage = (event as { percentage?: unknown }).percentage;
+      const layersOnGpu = (event as { layers_on_gpu?: unknown }).layers_on_gpu;
       if (typeof phase !== 'string' || typeof percentage !== 'number') return null;
-      return { type: 'status', phase, percentage };
+      return {
+        type: 'status',
+        phase,
+        percentage,
+        ...(typeof layersOnGpu === 'number' && layersOnGpu > 0
+          ? { layers_on_gpu: layersOnGpu }
+          : {}),
+      };
     }
     case 'token': {
       const token = (event as { token?: unknown }).token;

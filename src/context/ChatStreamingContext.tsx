@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { streamChat, streamNodesToLoadedDevices, appendChatEvent } from '../lib/api';
+import { streamChat, streamNodesToLoadedDevices, appendChatEvent, getLoadingStatus } from '../lib/api';
 import { useConversations } from './ConversationContext';
 import type { ChatMessage, LoadedDevice } from '../types/ui';
 
@@ -101,6 +101,7 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
       streamingContent: '',
       loadingPhase: '',
       loadingProgress: 0,
+      layersOnGpu: 0,
     });
 
     const history: ChatMessage[] = [
@@ -113,6 +114,43 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
       let assistantContent = '';
       let firstTokenTime: number | null = null;
       let tokenCount = 0;
+      let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+      const stopLoadingPoll = () => {
+        if (pollTimer !== null) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      };
+
+      const applyLoadingStatus = (phase: string, progress: number, layersOnGpu?: number) => {
+        if (assistantContent !== '') return;
+        patch(convId, {
+          loadingPhase: phase,
+          loadingProgress: progress,
+          ...(layersOnGpu != null && layersOnGpu > 0 ? { layersOnGpu } : {}),
+        });
+      };
+
+      const startLoadingPoll = () => {
+        stopLoadingPoll();
+        const poll = () => {
+          if (controller.signal.aborted || assistantContent !== '') {
+            stopLoadingPoll();
+            return;
+          }
+          void getLoadingStatus(model).then((status) => {
+            if (controller.signal.aborted || assistantContent !== '') return;
+            if (status.model !== '' && status.model !== model) return;
+            if (status.phase === '' && status.model === '') return;
+            applyLoadingStatus(status.phase, status.progress, status.layers_on_gpu);
+          }).catch(() => undefined);
+        };
+        poll();
+        pollTimer = setInterval(poll, 200);
+      };
+
+      startLoadingPoll();
 
       const attemptStream = async (isRetry: boolean): Promise<boolean> => {
         if (isRetry) {
@@ -129,15 +167,13 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
             });
           } else if (event.type === 'status') {
             if (assistantContent === '' && event.phase !== 'finished') {
-              patch(convId, {
-                loadingPhase: event.phase,
-                loadingProgress: event.percentage,
-              });
+              applyLoadingStatus(event.phase, event.percentage, event.layers_on_gpu);
             }
           } else if (event.type === 'token') {
             if (firstTokenTime === null) firstTokenTime = Date.now();
             tokenCount += 1;
             assistantContent += event.token;
+            stopLoadingPoll();
             patch(convId, { streamingContent: assistantContent, loadingPhase: '' });
           }
         }
@@ -189,6 +225,7 @@ export function ChatStreamingProvider({ children }: { children: ReactNode }) {
           }
         }
       } finally {
+        stopLoadingPoll();
         patch(convId, { streaming: false, streamingContent: '', loadingPhase: '' });
         delete abortRefs.current[convId];
       }

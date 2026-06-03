@@ -15,6 +15,7 @@ type ChatMessagesProps = {
 
 function phaseLabel(phase: string, progress: number): string {
   switch (phase) {
+    case 'started':
     case 'starting':
       return 'Starting instance…';
     case 'initializing':
@@ -27,6 +28,8 @@ function phaseLabel(phase: string, progress: number): string {
       return 'Loading model into memory…';
     case 'warming_up':
       return 'Warming up…';
+    case 'ready':
+      return 'Generating…';
     default:
       return '';
   }

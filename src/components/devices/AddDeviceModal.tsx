@@ -3,6 +3,7 @@ import QRCode from 'react-qr-code';
 import { useTheme } from '../../context/ThemeContext';
 import type { ConnectInfo } from '../../types/ui';
 import { apiRoutes } from '../../lib/routes';
+import { normalizeConnectInfo } from '../../lib/connectInfo';
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,7 @@ export function AddDeviceModal({ open, onClose }: AddDeviceModalProps) {
       });
       if (!res.ok) return;
       const info = (await res.json()) as ConnectInfo;
-      setConnectInfo(info);
+      setConnectInfo(await normalizeConnectInfo(info));
     } catch {
       // silently keep null state
     }

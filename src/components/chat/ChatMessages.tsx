@@ -228,7 +228,7 @@ export function ChatMessages({
               <span className="typing-dot" />
               <span className="typing-status-text">
                 {phaseLabel(loadingPhase, loadingProgress)}
-                {layersOnGpu > 0 && ` · ${layersOnGpu} layers on GPU`}
+                {layersOnGpu > 0 && ` · ${layersOnGpu} layers on RPC`}
               </span>
             </div>
           ) : (
